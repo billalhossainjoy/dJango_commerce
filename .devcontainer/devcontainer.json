@@ -1,0 +1,39 @@
+{
+  "name": "e-commerce",
+  "dockerComposeFile": "compose.yaml",
+  "service": "workspace",
+  "workspaceFolder": "/workspaces/e-commerce",
+  "shutdownAction": "stopCompose",
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "24",
+      "pnpmVersion": "11.22.0"
+    }
+  },
+  "postCreateCommand": "uv sync --project server --locked && CI=true pnpm --dir client install --frozen-lockfile",
+  "forwardPorts": [3000, 8000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js"
+    },
+    "8000": {
+      "label": "Django"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "openai.chatgpt",
+        "charliermarsh.ruff"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/home/vscode/.venvs/e-commerce-server/bin/python"
+      }
+    }
+  }
+}

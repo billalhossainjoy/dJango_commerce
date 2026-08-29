@@ -1,0 +1,8 @@
+.git
+.env*
+client/.next
+client/node_modules
+.pnpm-store
+server/.venv
+**/__pycache__
+*.py[cod]
