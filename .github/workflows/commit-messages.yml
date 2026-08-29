@@ -38,7 +38,18 @@ jobs:
           elif [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
             git fetch --no-tags origin "$DEFAULT_BRANCH"
             merge_base="$(git merge-base "origin/$DEFAULT_BRANCH" "$HEAD_SHA")"
-            revision_range="$merge_base..$HEAD_SHA"
+
+            if [[ "$merge_base" == "$HEAD_SHA" ]]; then
+              root_commit="$(git rev-list --max-parents=0 "$HEAD_SHA")"
+
+              if [[ "$root_commit" == "$HEAD_SHA" ]]; then
+                revision_range="$HEAD_SHA"
+              else
+                revision_range="$root_commit..$HEAD_SHA"
+              fi
+            else
+              revision_range="$merge_base..$HEAD_SHA"
+            fi
           else
             revision_range="$BEFORE_SHA..$HEAD_SHA"
           fi
