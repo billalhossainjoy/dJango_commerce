@@ -11,7 +11,7 @@
       "pnpmVersion": "11.22.0"
     }
   },
-  "postCreateCommand": "uv sync --project server --locked && CI=true pnpm --dir client install --frozen-lockfile",
+  "postCreateCommand": "uv sync --project server --locked && uv run --project server pre-commit install --hook-type commit-msg && CI=true pnpm --dir client install --frozen-lockfile",
   "forwardPorts": [3000, 8000],
   "portsAttributes": {
     "3000": {

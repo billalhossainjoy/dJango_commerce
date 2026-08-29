@@ -12,3 +12,9 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.18.0",
+    "pre-commit>=4.6.2",
+]

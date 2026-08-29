@@ -11,6 +11,7 @@ server/.venv/
 server/db.sqlite3
 
 # Node / Next.js
+/node_modules/
 client/node_modules/
 client/.next/
 client/out/
@@ -21,3 +22,6 @@ client/*.tsbuildinfo
 .DS_Store
 .idea/
 .vscode/
+
+# Private local planning documents
+docs/PRIVATE_IMPLEMENTATION_PLAN.md
