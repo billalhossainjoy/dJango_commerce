@@ -15,8 +15,9 @@ ENV_FILE = Path(
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, []),
+    CORS_ALLOWED_ORIGINS=(list, []),
+    CORS_ALLOWED_ORIGIN_REGEXES=(list, []),
     DATABASE_CONN_MAX_AGE=(int, 0),
-    INTERNAL_PROXY_SECRET=(str, ""),
 )
 
 # Environment variables supplied by the runtime win over values in the file.
@@ -33,7 +34,10 @@ DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
-INTERNAL_PROXY_SECRET = env("INTERNAL_PROXY_SECRET")
+CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
+CORS_ALLOWED_ORIGIN_REGEXES = env("CORS_ALLOWED_ORIGIN_REGEXES")
+CORS_ALLOW_CREDENTIALS = True
+CORS_URLS_REGEX = r"^/api/.*$"
 
 
 # Application definition
@@ -45,6 +49,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     "tenancy",
     "accounts",
@@ -52,7 +57,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "tenancy.middleware.TenantResolutionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",

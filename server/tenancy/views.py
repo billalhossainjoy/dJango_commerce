@@ -6,9 +6,12 @@ from tenancy.models import Tenant
 
 
 @api_view(["GET"])
-def tenant_context(request: Request) -> Response:
-    """Return public context for the hostname-derived tenant."""
-    tenant: Tenant | None = getattr(request, "tenant", None)
+def tenant_context(request: Request, tenant_slug: str) -> Response:
+    """Return public context for an active tenant selected by its URL slug."""
+    tenant = Tenant.objects.filter(
+        slug=tenant_slug,
+        status=Tenant.Status.ACTIVE,
+    ).first()
     if tenant is None:
         return Response({"detail": "Tenant not found."}, status=404)
 
