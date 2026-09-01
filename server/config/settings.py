@@ -16,6 +16,7 @@ env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, []),
     DATABASE_CONN_MAX_AGE=(int, 0),
+    INTERNAL_PROXY_SECRET=(str, ""),
 )
 
 # Environment variables supplied by the runtime win over values in the file.
@@ -31,6 +32,8 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+
+INTERNAL_PROXY_SECRET = env("INTERNAL_PROXY_SECRET")
 
 
 # Application definition

@@ -39,3 +39,45 @@ def test_middleware_leaves_tenant_empty_for_unknown_hostname():
     response = TenantResolutionMiddleware(get_response)(request)
 
     assert response.status_code == 200
+
+
+@pytest.mark.django_db
+@override_settings(
+    ALLOWED_HOSTS=["localhost"],
+    INTERNAL_PROXY_SECRET="test-proxy-secret",
+)
+def test_middleware_accepts_authenticated_proxy_hostname():
+    tenant = Tenant.objects.create(slug="demo")
+    TenantHostname.objects.create(tenant=tenant, hostname="demo.localhost")
+    request = RequestFactory().get(
+        "/api/v1/tenant/",
+        headers={
+            "host": "localhost:8000",
+            "x-tenant-hostname": "demo.localhost:3000",
+            "x-internal-proxy-secret": "test-proxy-secret",
+        },
+    )
+
+    def get_response(request):
+        assert request.tenant == tenant
+        return HttpResponse()
+
+    response = TenantResolutionMiddleware(get_response)(request)
+
+    assert response.status_code == 200
+
+
+@override_settings(INTERNAL_PROXY_SECRET="test-proxy-secret")
+def test_middleware_rejects_forged_proxy_hostname():
+    request = RequestFactory().get(
+        "/api/v1/tenant/",
+        headers={
+            "host": "localhost:8000",
+            "x-tenant-hostname": "demo.localhost:3000",
+            "x-internal-proxy-secret": "wrong-secret",
+        },
+    )
+
+    response = TenantResolutionMiddleware(lambda request: HttpResponse())(request)
+
+    assert response.status_code == 403

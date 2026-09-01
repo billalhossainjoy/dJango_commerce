@@ -1,7 +1,14 @@
 from collections.abc import Callable
+from secrets import compare_digest
 from typing import cast
 
-from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
+from django.conf import settings
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+)
 
 from tenancy.hostnames import InvalidHostname, resolve_hostname
 from tenancy.models import Tenant, TenantHostname
@@ -10,6 +17,8 @@ _TENANT_RESOLUTION_EXEMPT_PATHS = {
     "/api/v1/health/",
     "/api/v1/readiness/",
 }
+_PROXY_HOST_HEADER = "X-Tenant-Hostname"
+_PROXY_SECRET_HEADER = "X-Internal-Proxy-Secret"
 
 
 class TenantRequest(HttpRequest):
@@ -33,8 +42,19 @@ class TenantResolutionMiddleware:
         if tenant_request.path_info in _TENANT_RESOLUTION_EXEMPT_PATHS:
             return self.get_response(tenant_request)
 
+        hostname = tenant_request.headers.get(_PROXY_HOST_HEADER)
+        if hostname is not None:
+            supplied_secret = tenant_request.headers.get(_PROXY_SECRET_HEADER, "")
+            if not settings.INTERNAL_PROXY_SECRET or not compare_digest(
+                supplied_secret,
+                settings.INTERNAL_PROXY_SECRET,
+            ):
+                return HttpResponseForbidden()
+        else:
+            hostname = tenant_request.get_host()
+
         try:
-            tenant_hostname = resolve_hostname(tenant_request.get_host())
+            tenant_hostname = resolve_hostname(hostname)
         except InvalidHostname:
             return HttpResponseBadRequest()
 
