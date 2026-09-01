@@ -28,5 +28,5 @@ client/*.tsbuildinfo
 !.vscode/settings.json
 !.vscode/tasks.json
 
-# Private local planning documents
-docs/PRIVATE_IMPLEMENTATION_PLAN.md
+# Local project documentation and planning
+/docs/
