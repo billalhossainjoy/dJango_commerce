@@ -80,6 +80,9 @@ jobs:
       - name: Check Python formatting
         run: uv run --project server ruff format --check server
 
+      - name: Check Python types
+        run: uv run --project server mypy --config-file server/pyproject.toml server
+
       - name: Check Django configuration
         run: uv run --project server python server/manage.py check
 
