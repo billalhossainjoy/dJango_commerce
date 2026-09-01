@@ -85,7 +85,7 @@ uv run --project server ruff format --check server
 env -u DATABASE_URL DJANGO_ENVIRONMENT=test uv run --project server mypy --config-file server/pyproject.toml server
 uv run --project server python server/manage.py check
 uv run --project server python server/manage.py makemigrations --check --dry-run
-env -u DATABASE_URL DJANGO_ENVIRONMENT=test uv run --project server pytest server/tests
+env -u DATABASE_URL DJANGO_ENVIRONMENT=test uv run --project server pytest server
 pnpm --dir client lint
 pnpm --dir client build
 ```

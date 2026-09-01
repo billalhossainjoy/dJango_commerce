@@ -4,64 +4,55 @@ from ipaddress import ip_address
 from tenancy.models import TenantHostname
 
 _HOSTNAME_LABEL_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z")
-_MAX_HOSTNAME_LENGTH = 253
-
-_MAX_PORT = 65_535
 
 
 class InvalidHostname(ValueError):
-    """Raised when a hostname cannot be safely normalized."""
+    """Raised when a request hostname cannot be normalized."""
 
 
 def normalize_hostname(value: str) -> str:
-    """Return one normalized ASCII hostname or raise InvalidHostname."""
-    if not isinstance(value, str) or not value or value != value.strip():
-        raise InvalidHostname("Hostname must be a non-empty string without whitespace.")
+    """Normalize a domain name by removing its port and trailing dot."""
+    if not value or value != value.strip():
+        raise InvalidHostname("Hostname cannot be empty or contain outer whitespace.")
 
     if value.count(":") > 1:
-        raise InvalidHostname("IP address literals are not valid tenant hostnames.")
+        raise InvalidHostname("IP addresses cannot identify a tenant.")
 
     hostname, separator, port = value.rpartition(":")
     if separator:
         if not hostname or not port.isascii() or not port.isdecimal():
-            raise InvalidHostname("Hostname port must be a decimal number.")
+            raise InvalidHostname("Hostname port must be a number.")
 
-        port_number = int(port)
-        if not 1 <= port_number <= _MAX_PORT:
+        if not 1 <= int(port) <= 65_535:
             raise InvalidHostname("Hostname port must be between 1 and 65535.")
     else:
         hostname = value
 
-    hostname = hostname.removesuffix(".")
+    hostname = hostname.removesuffix(".").lower()
     if not hostname:
         raise InvalidHostname("Hostname cannot be empty.")
-
-    try:
-        hostname = hostname.encode("idna").decode("ascii").lower()
-    except UnicodeError as error:
-        raise InvalidHostname(
-            "Hostname contains an invalid international label."
-        ) from error
 
     try:
         ip_address(hostname)
     except ValueError:
         pass
     else:
-        raise InvalidHostname("IP address literals are not valid tenant hostnames.")
+        raise InvalidHostname("IP addresses cannot identify a tenant.")
 
-    if len(hostname) > _MAX_HOSTNAME_LENGTH:
+    if len(hostname) > 253:
         raise InvalidHostname("Hostname cannot exceed 253 characters.")
 
-    labels = hostname.split(".")
-    if any(_HOSTNAME_LABEL_PATTERN.fullmatch(label) is None for label in labels):
+    if any(
+        _HOSTNAME_LABEL_PATTERN.fullmatch(label) is None
+        for label in hostname.split(".")
+    ):
         raise InvalidHostname("Hostname contains an invalid DNS label.")
 
     return hostname
 
 
 def resolve_hostname(value: str) -> TenantHostname | None:
-    """Resolve an exact active hostname record, or return None when unknown."""
+    """Return the exact active hostname record, or None when it is unknown."""
     hostname = normalize_hostname(value)
 
     return (
