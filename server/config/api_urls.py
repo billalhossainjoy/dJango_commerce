@@ -7,4 +7,5 @@ urlpatterns = [
     path("readiness/", readiness, name="api-readiness"),
     path("auth/", include("accounts.urls")),
     path("", include("tenancy.urls")),
+    path("", include("catalog.urls")),
 ]
