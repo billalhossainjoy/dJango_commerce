@@ -1,12 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
-import { FieldError, FieldGroup } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { FormInput } from "@/components/ui/form-input";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { getApiErrorMessage } from "@/lib/api-client";
 
@@ -33,20 +34,21 @@ const signupSchema = z
 
 type SignupValues = z.infer<typeof signupSchema>;
 
-function getTenantLoginUrl(tenantSlug: string): string {
+function getPlatformLoginUrl(): string {
   const rootDomain = process.env.NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN;
   if (!rootDomain) {
     throw new Error("The platform root domain is not configured.");
   }
 
   const port = window.location.port ? `:${window.location.port}` : "";
-  return `${window.location.protocol}//${tenantSlug}.${rootDomain}${port}/login`;
+  return `${window.location.protocol}//${rootDomain}${port}/login`;
 }
 
 export function SignupForm() {
   const { signup } = useAuth();
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -61,10 +63,13 @@ export function SignupForm() {
     },
   });
 
+  const slug = useWatch({ control, name: "slug" }).trim();
+  const rootDomain = process.env.NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN;
+
   const submitSignup = handleSubmit(async (values) => {
     try {
-      const result = await signup(values);
-      window.location.assign(getTenantLoginUrl(result.tenant.slug));
+      await signup(values);
+      window.location.assign(getPlatformLoginUrl());
     } catch (error) {
       setError("root", {
         message: getApiErrorMessage(
@@ -87,14 +92,36 @@ export function SignupForm() {
           {...register("storeName")}
         />
 
-        <FormInput
-          id="store-slug"
-          label="Store URL"
-          type="text"
-          autoComplete="off"
-          error={errors.slug}
-          {...register("slug")}
-        />
+        <Field data-invalid={!!errors.slug}>
+          <FieldLabel htmlFor="store-slug">Store URL</FieldLabel>
+          <div className="flex min-w-0 items-stretch">
+            <Input
+              id="store-slug"
+              className={rootDomain ? "relative z-10 rounded-r-none" : undefined}
+              type="text"
+              placeholder="storename"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              aria-invalid={!!errors.slug}
+              aria-describedby={`store-url-preview${errors.slug ? " store-slug-error" : ""}`}
+              {...register("slug")}
+            />
+            {rootDomain ? (
+              <span className="flex shrink-0 items-center whitespace-nowrap rounded-r-md border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+                .{rootDomain}
+              </span>
+            ) : null}
+          </div>
+          <FieldDescription id="store-url-preview" className="break-words" aria-live="polite">
+            {rootDomain ? (
+              <>Your store URL: <span className="font-medium text-foreground">{slug || "storename"}.{rootDomain}</span></>
+            ) : (
+              "Your store address will use the platform domain."
+            )}
+          </FieldDescription>
+          <FieldError id="store-slug-error" errors={[errors.slug]} />
+        </Field>
 
         <FormInput
           id="signup-email"

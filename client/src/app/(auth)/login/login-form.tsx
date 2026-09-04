@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -9,6 +10,7 @@ import { FormInput } from "@/components/ui/form-input";
 import { Button } from "@/components/ui/button";
 import { FieldError, FieldGroup } from "@/components/ui/field";
 import { useAuth } from "@/hooks/use-auth";
+import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { getApiErrorMessage } from "@/lib/api-client";
 
 const loginSchema = z.object({
@@ -18,8 +20,16 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
-  const { login, logout, status } = useAuth();
+export function LoginForm({
+  tenantSlug,
+  nextPath,
+}: {
+  tenantSlug: string | null;
+  nextPath: string;
+}) {
+  const router = useRouter();
+  const platformAuth = useAuth();
+  const customerAuth = useCustomerAuth(tenantSlug ?? "");
   const {
     register,
     handleSubmit,
@@ -32,7 +42,13 @@ export function LoginForm() {
 
   const submitLogin = handleSubmit(async ({ email, password }) => {
     try {
-      await login({ email, password });
+      if (tenantSlug) {
+        await customerAuth.login({ email, password });
+        router.replace(nextPath);
+      } else {
+        await platformAuth.login({ email, password });
+        router.replace("/admin");
+      }
     } catch (error) {
       setError("root", {
         message: getApiErrorMessage(
@@ -42,35 +58,6 @@ export function LoginForm() {
       });
     }
   });
-
-  if (status === "loading") {
-    return (
-      <p className="mt-8 text-sm text-zinc-600" role="status">
-        Checking your session…
-      </p>
-    );
-  }
-
-  if (status === "authenticated") {
-    return (
-      <div className="mt-8">
-        <p
-          className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
-          role="status"
-        >
-          You are logged in.
-        </p>
-        <Button
-          className="mt-4 w-full"
-          variant="outline"
-          type="button"
-          onClick={() => void logout()}
-        >
-          Log out
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -102,9 +89,9 @@ export function LoginForm() {
         </FieldGroup>
       </form>
 
-      <p className="mt-6 text-center text-sm text-zinc-600">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         Need an account?{" "}
-        <Link className="font-medium text-zinc-950 underline" href="/signup">
+        <Link className="font-medium text-primary underline underline-offset-4 hover:text-primary/80" href="/signup">
           Sign up
         </Link>
       </p>

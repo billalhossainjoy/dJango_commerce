@@ -55,6 +55,48 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Account and authentication pages share the storefront's light palette. */
+.account-theme,
+.auth-theme {
+  color-scheme: light;
+  --background: #fafafa;
+  --foreground: #18181b;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --muted: #f4f4f5;
+  --muted-foreground: #52525b;
+  --border: #e4e4e7;
+  --input: #d4d4d8;
+  --ring: #71717a;
+  --destructive: #dc2626;
+}
+
+.auth-theme [data-slot="field-label"] {
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.auth-theme [data-invalid="true"] [data-slot="field-label"] {
+  color: var(--destructive);
+}
+
+.auth-theme [data-slot="input"] {
+  height: 2.75rem;
+  background-color: var(--card);
+  color: var(--card-foreground);
+  padding-inline: 0.75rem;
+  font-size: 1rem;
+}
+
+.auth-theme [data-slot="button"][type="submit"] {
+  height: 2.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 /* The administration workspace intentionally uses a consistent light theme. */
 .admin-theme {
   color-scheme: light;
