@@ -14,9 +14,8 @@ help:
 dev:
 	@set -e; \
 	$(MAKE) server & server_pid=$$!; \
-	$(MAKE) client & client_pid=$$!; \
-	trap 'kill $$server_pid $$client_pid 2>/dev/null || true' EXIT INT TERM; \
-	wait -n $$server_pid $$client_pid
+	trap 'kill $$server_pid 2>/dev/null || true; wait $$server_pid 2>/dev/null || true' EXIT INT TERM; \
+	$(MAKE) client
 
 client:
 	pnpm --dir client dev --hostname 0.0.0.0

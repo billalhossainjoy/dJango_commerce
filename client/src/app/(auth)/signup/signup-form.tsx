@@ -4,11 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { getApiErrorMessage } from "@/app/app.service";
 import { Button } from "@/components/ui/button";
 import { FieldError, FieldGroup } from "@/components/ui/field";
 import { FormInput } from "@/components/ui/form-input";
 import { useAuth } from "@/hooks/use-auth";
+import { getApiErrorMessage } from "@/lib/api-client";
 
 const signupSchema = z
   .object({

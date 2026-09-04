@@ -1,4 +1,4 @@
-import { ApiError } from "@/app/app.service";
+import { apiRequest } from "@/lib/api-client";
 
 export type Product = {
   id: string;
@@ -15,55 +15,82 @@ export type Product = {
 export type ProductInput = Omit<Product, "id" | "created_at" | "updated_at">;
 
 export class ProductService {
-  async list(
+  list(
     tenantSlug: string,
     accessToken: string,
     signal?: AbortSignal,
   ): Promise<Product[]> {
     const encodedSlug = encodeURIComponent(tenantSlug);
-    const response = await fetch(
+    return apiRequest<Product[]>(
       `/api/v1/tenants/${encodedSlug}/admin/products/`,
       {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
+        accessToken,
         signal,
       },
     );
-
-    if (!response.ok) {
-      const details = await response.json().catch(() => null);
-      throw new ApiError(response.status, details);
-    }
-
-    return (await response.json()) as Product[];
   }
 
-  async create(
+  create(
     tenantSlug: string,
     input: ProductInput,
     accessToken: string,
   ): Promise<Product> {
     const encodedSlug = encodeURIComponent(tenantSlug);
-    const response = await fetch(
+    return apiRequest<Product>(
       `/api/v1/tenants/${encodedSlug}/admin/products/`,
       {
         method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(input),
+        accessToken,
+        body: input,
       },
     );
+  }
 
-    if (!response.ok) {
-      const details = await response.json().catch(() => null);
-      throw new ApiError(response.status, details);
-    }
+  retrieve(
+    tenantSlug: string,
+    productId: string,
+    accessToken: string,
+    signal?: AbortSignal,
+  ): Promise<Product> {
+    const encodedSlug = encodeURIComponent(tenantSlug);
+    const encodedId = encodeURIComponent(productId);
+    return apiRequest<Product>(
+      `/api/v1/tenants/${encodedSlug}/admin/products/${encodedId}/`,
+      { accessToken, signal },
+    );
+  }
 
-    return (await response.json()) as Product;
+  update(
+    tenantSlug: string,
+    productId: string,
+    input: ProductInput,
+    accessToken: string,
+  ): Promise<Product> {
+    const encodedSlug = encodeURIComponent(tenantSlug);
+    const encodedId = encodeURIComponent(productId);
+    return apiRequest<Product>(
+      `/api/v1/tenants/${encodedSlug}/admin/products/${encodedId}/`,
+      {
+        method: "PATCH",
+        accessToken,
+        body: input,
+      },
+    );
+  }
+
+  remove(
+    tenantSlug: string,
+    productId: string,
+    accessToken: string,
+  ): Promise<void> {
+    const encodedSlug = encodeURIComponent(tenantSlug);
+    const encodedId = encodeURIComponent(productId);
+    return apiRequest<void>(
+      `/api/v1/tenants/${encodedSlug}/admin/products/${encodedId}/`,
+      {
+        method: "DELETE",
+        accessToken,
+      },
+    );
   }
 }

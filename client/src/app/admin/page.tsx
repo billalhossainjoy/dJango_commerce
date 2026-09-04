@@ -1,22 +1,21 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { AppService, type CurrentUser } from "@/app/app.service";
 import { Button } from "@/components/ui/button";
+import {
+  currentUserQueryKey,
+  useCurrentUser,
+} from "@/hooks/use-current-user";
 import { useAuthStore } from "@/stores/auth-store";
 
 const appService = new AppService();
-const currentUserQueryKey = ["auth", "current-user"] as const;
 
 export default function AdminDashboardPage() {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const currentUser = useQuery({
-    queryKey: currentUserQueryKey,
-    queryFn: ({ signal }) => appService.getCurrentUser(accessToken!, signal),
-    enabled: accessToken !== null,
-  });
+  const currentUser = useCurrentUser();
   const activation = useMutation({
     mutationFn: () =>
       appService.activateTenant(currentUser.data!.tenant!.slug, accessToken!),
@@ -42,16 +41,16 @@ export default function AdminDashboardPage() {
   const tenant = currentUser.data.tenant;
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <p className="text-sm font-medium text-zinc-500">Store dashboard</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
+    <div className="mx-auto max-w-6xl">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Overview</p>
+      <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
         {tenant.name}
       </h1>
 
-      <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-6">
+      <section className="mt-8 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-200/60 sm:p-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-semibold text-zinc-950">Store status</h2>
+            <h2 className="text-lg font-semibold text-slate-950">Store status</h2>
             <p className="mt-1 text-sm text-zinc-600">
               {tenant.status === "active"
                 ? "Your storefront is live."

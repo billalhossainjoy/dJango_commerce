@@ -54,3 +54,43 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* The administration workspace intentionally uses a consistent light theme. */
+.admin-theme {
+  color-scheme: light;
+  --background: #f6f7fb;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --input: #cbd5e1;
+  --ring: #6366f1;
+  --destructive: #dc2626;
+}
+
+.admin-theme [data-slot="field-label"] {
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.admin-theme [data-slot="input"] {
+  border-color: #cbd5e1;
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.admin-theme [data-slot="input"]::placeholder,
+.admin-theme textarea::placeholder {
+  color: #94a3b8;
+}
+
+.admin-theme [data-slot="input"]:focus-visible,
+.admin-theme textarea:focus-visible {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.14);
+}
