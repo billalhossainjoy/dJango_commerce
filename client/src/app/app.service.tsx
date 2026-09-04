@@ -53,18 +53,8 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 export class AppService {
-  private getPublicApiUrl(): string {
-    const publicApiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    if (!publicApiUrl) {
-      throw new Error("The public Django API is not configured.");
-    }
-
-    return publicApiUrl;
-  }
-
   private async post<T>(path: string, body: unknown): Promise<T> {
-    const response = await fetch(new URL(path, this.getPublicApiUrl()), {
+    const response = await fetch(path, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -92,7 +82,7 @@ export class AppService {
   ): Promise<TenantContext | null> {
     const encodedSlug = encodeURIComponent(tenantSlug);
     const response = await fetch(
-      new URL(`/api/v1/tenants/${encodedSlug}/`, this.getPublicApiUrl()),
+      `/api/v1/tenants/${encodedSlug}/`,
       {
         headers: { Accept: "application/json" },
         signal,
