@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -150,8 +151,22 @@ AUTHENTICATION_BACKENDS = [
     "accounts.backends.PlatformAuthenticationBackend",
 ]
 
+# Email uniqueness is enforced by conditional database constraints: globally for
+# platform users and per tenant for customers. The platform authentication
+# backend applies the matching account-type scope before looking up a user.
+SILENCED_SYSTEM_CHECKS = ["auth.W004"]
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
 }
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+}
+
+JWT_REFRESH_COOKIE_NAME = "refresh_token"
+JWT_REFRESH_COOKIE_MAX_AGE = int(SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
+JWT_REFRESH_COOKIE_SECURE = not DEBUG

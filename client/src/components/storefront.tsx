@@ -43,15 +43,6 @@ export function Storefront({ tenantSlug }: { tenantSlug: string | null }) {
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
-      <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <h1 className="text-xl font-semibold tracking-tight">{tenant.name}</h1>
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium uppercase tracking-wide text-emerald-700">
-            {tenant.status}
-          </span>
-        </div>
-      </header>
-
       <section className="mx-auto max-w-6xl px-6 py-24">
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-zinc-500">
           {tenant.slug}

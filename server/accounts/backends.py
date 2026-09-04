@@ -1,5 +1,6 @@
-from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
+
+from accounts.models import User
 
 
 class PlatformAuthenticationBackend(ModelBackend):
@@ -8,8 +9,6 @@ class PlatformAuthenticationBackend(ModelBackend):
 
         if not email or not password:
             return None
-
-        User = get_user_model()
 
         user = User.objects.filter(
             email__iexact=email,

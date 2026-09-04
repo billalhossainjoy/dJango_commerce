@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from django.contrib.auth.base_user import BaseUserManager
 
@@ -9,7 +11,16 @@ if TYPE_CHECKING:
 class UserManager(BaseUserManager["User"]):
     use_in_migrations = True
 
-    def create_user(self, email, password=None, **extra_fields):
+    @classmethod
+    def normalize_email(cls, email: str | None) -> str:
+        return super().normalize_email(email)
+
+    def create_user(
+        self,
+        email: str,
+        password: str | None = None,
+        **extra_fields: Any,
+    ) -> User:
         if not email:
             raise ValueError("Users must have an email address.")
 
@@ -19,7 +30,12 @@ class UserManager(BaseUserManager["User"]):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(
+        self,
+        email: str,
+        password: str | None = None,
+        **extra_fields: Any,
+    ) -> User:
         extra_fields.setdefault("account_type", "platform")
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)

@@ -11,7 +11,6 @@ def test_user_can_signup_login_refresh_and_logout(client):
         data={
             "email": "user@example.com",
             "password": "strong-test-password-123",
-            "password_confirm": "strong-test-password-123",
         },
     )
 
@@ -30,28 +29,22 @@ def test_user_can_signup_login_refresh_and_logout(client):
     )
 
     assert login_response.status_code == 200
-    refresh_token = login_response.json()["refresh"]
     assert login_response.json()["access"]
+    assert "refresh" not in login_response.json()
+    refresh_cookie = login_response.cookies["refresh_token"]
+    assert refresh_cookie["httponly"]
+    assert refresh_cookie["samesite"] == "Lax"
 
-    refresh_response = client.post(
-        reverse("token-refresh"),
-        data={"refresh": refresh_token},
-    )
+    refresh_response = client.post(reverse("token-refresh"))
 
     assert refresh_response.status_code == 200
     assert refresh_response.json()["access"]
 
-    logout_response = client.post(
-        reverse("auth-logout"),
-        data={"refresh": refresh_token},
-    )
+    logout_response = client.post(reverse("auth-logout"))
 
     assert logout_response.status_code == 204
 
-    rejected_refresh_response = client.post(
-        reverse("token-refresh"),
-        data={"refresh": refresh_token},
-    )
+    rejected_refresh_response = client.post(reverse("token-refresh"))
 
     assert rejected_refresh_response.status_code == 401
 

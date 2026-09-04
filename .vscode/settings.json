@@ -17,6 +17,7 @@
     "${workspaceFolder}/server"
   ],
   "python.analysis.typeCheckingMode": "basic",
+  "python.terminal.activateEnvironment": false,
   "python.envFile": "${workspaceFolder}/.env.test",
   "python.testing.pytestArgs": [
     "server/tests"
