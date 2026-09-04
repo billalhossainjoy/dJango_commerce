@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -13,6 +12,16 @@ import { useAuth } from "@/hooks/use-auth";
 
 const signupSchema = z
   .object({
+    storeName: z.string().trim().min(1, "Store name is required."),
+    slug: z
+      .string()
+      .trim()
+      .min(1, "Store URL is required.")
+      .max(63, "Store URL must contain at most 63 characters.")
+      .regex(
+        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+        "Use lowercase letters, numbers, and single hyphens.",
+      ),
     email: z.email("Enter a valid email address."),
     password: z.string().min(8, "Password must contain at least 8 characters."),
     passwordConfirm: z.string(),
@@ -24,25 +33,38 @@ const signupSchema = z
 
 type SignupValues = z.infer<typeof signupSchema>;
 
+function getTenantLoginUrl(tenantSlug: string): string {
+  const rootDomain = process.env.NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN;
+  if (!rootDomain) {
+    throw new Error("The platform root domain is not configured.");
+  }
+
+  const port = window.location.port ? `:${window.location.port}` : "";
+  return `${window.location.protocol}//${tenantSlug}.${rootDomain}${port}/login`;
+}
+
 export function SignupForm() {
   const { signup } = useAuth();
-  const [isComplete, setIsComplete] = useState(false);
   const {
     register,
     handleSubmit,
-    reset,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<SignupValues>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: "", password: "", passwordConfirm: "" },
+    defaultValues: {
+      storeName: "",
+      slug: "",
+      email: "",
+      password: "",
+      passwordConfirm: "",
+    },
   });
 
   const submitSignup = handleSubmit(async (values) => {
     try {
-      await signup(values);
-      reset();
-      setIsComplete(true);
+      const result = await signup(values);
+      window.location.assign(getTenantLoginUrl(result.tenant.slug));
     } catch (error) {
       setError("root", {
         message: getApiErrorMessage(
@@ -53,20 +75,27 @@ export function SignupForm() {
     }
   });
 
-  if (isComplete) {
-    return (
-      <div
-        className="mt-8 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"
-        role="status"
-      >
-        Your account was created successfully. You can now log in.
-      </div>
-    );
-  }
-
   return (
     <form className="mt-8" onSubmit={submitSignup}>
       <FieldGroup>
+        <FormInput
+          id="store-name"
+          label="Store name"
+          type="text"
+          autoComplete="organization"
+          error={errors.storeName}
+          {...register("storeName")}
+        />
+
+        <FormInput
+          id="store-slug"
+          label="Store URL"
+          type="text"
+          autoComplete="off"
+          error={errors.slug}
+          {...register("slug")}
+        />
+
         <FormInput
           id="signup-email"
           label="Email"

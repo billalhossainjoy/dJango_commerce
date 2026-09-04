@@ -1,8 +1,10 @@
 import pytest
 from django.test import override_settings
 from django.urls import reverse
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from tenancy.models import Tenant
+from accounts.models import User
+from tenancy.models import Tenant, TenantOwner
 
 
 @pytest.mark.django_db
@@ -68,3 +70,47 @@ def test_tenant_api_allows_only_configured_frontend_origin(client):
         "http://demo.localhost:3000"
     )
     assert "access-control-allow-origin" not in blocked_response
+
+
+@pytest.mark.django_db
+def test_owner_can_activate_their_provisioning_tenant(client):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    tenant = Tenant.objects.create(slug="demo", name="Demo Store")
+    TenantOwner.objects.create(user=owner, tenant=tenant)
+    access_token = str(RefreshToken.for_user(owner).access_token)
+
+    response = client.post(
+        reverse("tenant-activate", kwargs={"tenant_slug": tenant.slug}),
+        headers={"authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == Tenant.Status.ACTIVE
+    tenant.refresh_from_db()
+    assert tenant.status == Tenant.Status.ACTIVE
+
+
+@pytest.mark.django_db
+def test_owner_cannot_activate_another_tenant(client):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    owned_tenant = Tenant.objects.create(slug="owned", name="Owned Store")
+    other_tenant = Tenant.objects.create(slug="other", name="Other Store")
+    TenantOwner.objects.create(user=owner, tenant=owned_tenant)
+    access_token = str(RefreshToken.for_user(owner).access_token)
+
+    response = client.post(
+        reverse("tenant-activate", kwargs={"tenant_slug": other_tenant.slug}),
+        headers={"authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    other_tenant.refresh_from_db()
+    assert other_tenant.status == Tenant.Status.PROVISIONING

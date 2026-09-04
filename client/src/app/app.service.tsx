@@ -9,6 +9,13 @@ export type AuthTokens = {
   access: string;
 };
 
+export type CurrentUser = {
+  id: string;
+  email: string;
+  account_type: "platform" | "customer";
+  tenant: TenantContext | null;
+};
+
 export type LoginInput = {
   email: string;
   password: string;
@@ -18,11 +25,14 @@ export type SignupInput = {
   email: string;
   password: string;
   passwordConfirm: string;
+  storeName: string;
+  slug: string;
 };
 
 export type SignupResult = {
   id: string;
   email: string;
+  tenant: TenantContext;
 };
 
 export class ApiError extends Error {
@@ -53,13 +63,42 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 export class AppService {
-  private async post<T>(path: string, body: unknown): Promise<T> {
-    const response = await fetch(path, {
-      method: "POST",
+  async getCurrentUser(
+    accessToken: string,
+    signal?: AbortSignal,
+  ): Promise<CurrentUser> {
+    const response = await fetch("/api/v1/auth/me/", {
       headers: {
         Accept: "application/json",
-        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
       },
+      signal,
+    });
+
+    if (!response.ok) {
+      const details = await response.json().catch(() => null);
+      throw new ApiError(response.status, details);
+    }
+
+    return (await response.json()) as CurrentUser;
+  }
+
+  private async post<T>(
+    path: string,
+    body: unknown,
+    accessToken?: string,
+  ): Promise<T> {
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(path, {
+      method: "POST",
+      headers,
       credentials: "include",
       body: JSON.stringify(body),
     });
@@ -105,6 +144,8 @@ export class AppService {
     return this.post<SignupResult>("/api/v1/auth/signup/", {
       email: input.email,
       password: input.password,
+      store_name: input.storeName,
+      slug: input.slug,
     });
   }
 
@@ -118,5 +159,17 @@ export class AppService {
 
   logout(): Promise<void> {
     return this.post<void>("/api/v1/auth/logout/", {});
+  }
+
+  activateTenant(
+    tenantSlug: string,
+    accessToken: string,
+  ): Promise<TenantContext> {
+    const encodedSlug = encodeURIComponent(tenantSlug);
+    return this.post<TenantContext>(
+      `/api/v1/tenants/${encodedSlug}/activate/`,
+      {},
+      accessToken,
+    );
   }
 }
