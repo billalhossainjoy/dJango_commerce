@@ -1,11 +1,17 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework_simplejwt.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
 from tenancy.models import Tenant, TenantHostname, TenantOwner
+
+logger = logging.getLogger(__name__)
 
 
 class TenantSummarySerializer(serializers.Serializer):
@@ -40,11 +46,10 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 class CustomerSignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-    password_confirmation = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ("id", "email", "password", "password_confirmation")
+        fields = ("id", "email", "password")
         read_only_fields = ("id",)
 
     def validate_email(self, value: str) -> str:
@@ -62,25 +67,12 @@ class CustomerSignupSerializer(serializers.ModelSerializer):
         validate_password(value)
         return value
 
-    def validate(self, attrs):
-        if attrs["password"] != attrs["password_confirmation"]:
-            raise serializers.ValidationError(
-                {"password_confirmation": "Passwords do not match."}
-            )
-        return attrs
-
     def create(self, validated_data):
-        validated_data.pop("password_confirmation")
         return User.objects.create_user(
             **validated_data,
             tenant=self.context["tenant"],
             account_type=User.AccountType.CUSTOMER,
         )
-
-
-class CustomerLoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
 
 
 def customer_refresh_token(user: User) -> RefreshToken:
@@ -92,6 +84,36 @@ def customer_refresh_token(user: User) -> RefreshToken:
     token["tenant_id"] = str(user.tenant.id)
     token["tenant_slug"] = user.tenant.slug
     return token
+
+
+class CustomerTokenObtainPairSerializer(TokenObtainPairSerializer):
+    username_field = User.USERNAME_FIELD
+    default_error_messages = {
+        "no_active_account": "Invalid email or password.",
+    }
+
+    def validate(self, attrs):
+        tenant = self.context["tenant"]
+        email = User.objects.normalize_email(attrs["email"]).casefold()
+        password = attrs["password"]
+        user = User.objects.filter(
+            email__iexact=email,
+            account_type=User.AccountType.CUSTOMER,
+            tenant=tenant,
+        ).first()
+
+        if user is None:
+            User().set_password(password)
+
+        if user is None or not user.check_password(password) or not user.is_active:
+            logger.warning("Customer login failed", extra={"tenant_slug": tenant.slug})
+            raise AuthenticationFailed(
+                str(self.error_messages["no_active_account"]),
+                "no_active_account",
+            )
+
+        refresh = customer_refresh_token(user)
+        return {"refresh": str(refresh), "access": str(refresh.access_token)}
 
 
 class SignupSerializer(serializers.ModelSerializer):

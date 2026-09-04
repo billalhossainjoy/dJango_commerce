@@ -1,4 +1,4 @@
-import logging
+from typing import Any, cast
 
 from django.conf import settings
 from django.shortcuts import get_object_or_404
@@ -15,16 +15,17 @@ from accounts.models import User
 from accounts.permissions import IsCustomerForTenant, IsPlatformUser
 from accounts.serializers import (
     CurrentUserSerializer,
-    CustomerLoginSerializer,
     CustomerSerializer,
     CustomerSignupSerializer,
+    CustomerTokenObtainPairSerializer,
     SignupSerializer,
     customer_refresh_token,
 )
 from accounts.throttles import CustomerLoginThrottle, CustomerSignupThrottle
 from tenancy.models import Tenant
 
-logger = logging.getLogger(__name__)
+PLATFORM_COOKIE_PATH = "/api/v1/auth/"
+CUSTOMER_COOKIE_PATH = "/api/v1/tenants/"
 
 
 class SignupView(APIView):
@@ -45,10 +46,10 @@ class CurrentUserView(APIView):
         return Response(serializer.data)
 
 
-def set_refresh_cookie(response, name, refresh_token, path):
+def set_refresh_cookie(response, *, name, token, path):
     response.set_cookie(
         key=name,
-        value=refresh_token,
+        value=token,
         max_age=settings.JWT_REFRESH_COOKIE_MAX_AGE,
         httponly=True,
         secure=settings.JWT_REFRESH_COOKIE_SECURE,
@@ -57,17 +58,25 @@ def set_refresh_cookie(response, name, refresh_token, path):
     )
 
 
+def move_refresh_to_cookie(response, *, name, path):
+    refresh_token = response.data.pop("refresh")
+    set_refresh_cookie(
+        response,
+        name=name,
+        token=refresh_token,
+        path=path,
+    )
+    return response
+
+
 class LoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
-        refresh_token = response.data.pop("refresh")
-        set_refresh_cookie(
+        return move_refresh_to_cookie(
             response,
-            settings.JWT_PLATFORM_REFRESH_COOKIE_NAME,
-            refresh_token,
-            "/api/v1/auth/",
+            name=settings.JWT_PLATFORM_REFRESH_COOKIE_NAME,
+            path=PLATFORM_COOKIE_PATH,
         )
-        return response
 
 
 class RefreshView(TokenRefreshView):
@@ -80,7 +89,7 @@ class RefreshView(TokenRefreshView):
             )
 
         try:
-            token = RefreshToken(refresh_token)  # type: ignore[arg-type]
+            token = RefreshToken(cast(Any, refresh_token))
             platform_user_exists = User.objects.filter(
                 id=token["user_id"],
                 account_type=User.AccountType.PLATFORM,
@@ -103,32 +112,39 @@ class RefreshView(TokenRefreshView):
         if rotated_refresh:
             set_refresh_cookie(
                 response,
-                settings.JWT_PLATFORM_REFRESH_COOKIE_NAME,
-                rotated_refresh,
-                "/api/v1/auth/",
+                name=settings.JWT_PLATFORM_REFRESH_COOKIE_NAME,
+                token=rotated_refresh,
+                path=PLATFORM_COOKIE_PATH,
             )
         return response
 
 
-class LogoutView(APIView):
+class RefreshCookieLogoutView(APIView):
     permission_classes = [AllowAny]
+    refresh_cookie_name: str
+    refresh_cookie_path: str
 
-    def post(self, request: Request) -> Response:
-        refresh_token = request.COOKIES.get(settings.JWT_PLATFORM_REFRESH_COOKIE_NAME)
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        refresh_token = request.COOKIES.get(self.refresh_cookie_name)
 
         if refresh_token:
             try:
-                RefreshToken(refresh_token).blacklist()  # type: ignore[arg-type]
+                RefreshToken(cast(Any, refresh_token)).blacklist()
             except TokenError:
                 pass
 
         response = Response(status=status.HTTP_204_NO_CONTENT)
         response.delete_cookie(
-            settings.JWT_PLATFORM_REFRESH_COOKIE_NAME,
-            path="/api/v1/auth/",
+            self.refresh_cookie_name,
+            path=self.refresh_cookie_path,
             samesite="Lax",
         )
         return response
+
+
+class LogoutView(RefreshCookieLogoutView):
+    refresh_cookie_name = settings.JWT_PLATFORM_REFRESH_COOKIE_NAME
+    refresh_cookie_path = PLATFORM_COOKIE_PATH
 
 
 def active_tenant(tenant_slug: str) -> Tenant:
@@ -154,46 +170,22 @@ class CustomerSignupView(APIView):
         return Response(CustomerSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
-class CustomerLoginView(APIView):
-    permission_classes = [AllowAny]
+class CustomerLoginView(TokenObtainPairView):
+    serializer_class = CustomerTokenObtainPairSerializer
     throttle_classes = [CustomerLoginThrottle]
 
-    def post(self, request: Request, tenant_slug: str) -> Response:
-        tenant = active_tenant(tenant_slug)
-        credentials = CustomerLoginSerializer(data=request.data)
-        credentials.is_valid(raise_exception=True)
-        email = User.objects.normalize_email(
-            credentials.validated_data["email"]
-        ).casefold()
-        password = credentials.validated_data["password"]
-        user = User.objects.filter(
-            email__iexact=email,
-            account_type=User.AccountType.CUSTOMER,
-            tenant=tenant,
-        ).first()
+    def get_serializer_context(self):
+        context = dict(super().get_serializer_context())
+        context["tenant"] = active_tenant(self.kwargs["tenant_slug"])
+        return context
 
-        if user is None:
-            User().set_password(password)
-
-        if user is None or not user.check_password(password) or not user.is_active:
-            logger.warning(
-                "Customer login failed",
-                extra={"tenant_slug": tenant_slug},
-            )
-            return Response(
-                {"detail": "Invalid email or password."},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        refresh = customer_refresh_token(user)
-        response = Response({"access": str(refresh.access_token)})
-        set_refresh_cookie(
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        return move_refresh_to_cookie(
             response,
-            settings.JWT_CUSTOMER_REFRESH_COOKIE_NAME,
-            str(refresh),
-            "/api/v1/tenants/",
+            name=settings.JWT_CUSTOMER_REFRESH_COOKIE_NAME,
+            path=CUSTOMER_COOKIE_PATH,
         )
-        return response
 
 
 class CustomerRefreshView(APIView):
@@ -209,7 +201,7 @@ class CustomerRefreshView(APIView):
             )
 
         try:
-            old_refresh = RefreshToken(encoded_token)  # type: ignore[arg-type]
+            old_refresh = RefreshToken(cast(Any, encoded_token))
             if old_refresh.get(
                 "account_type"
             ) != User.AccountType.CUSTOMER or old_refresh.get("tenant_id") != str(
@@ -222,7 +214,7 @@ class CustomerRefreshView(APIView):
                 tenant=tenant,
                 is_active=True,
             )
-            old_refresh.blacklist()  # type: ignore[arg-type]
+            old_refresh.blacklist()
             refresh = customer_refresh_token(user)
         except TokenError, User.DoesNotExist, KeyError:
             return Response(
@@ -233,31 +225,16 @@ class CustomerRefreshView(APIView):
         response = Response({"access": str(refresh.access_token)})
         set_refresh_cookie(
             response,
-            settings.JWT_CUSTOMER_REFRESH_COOKIE_NAME,
-            str(refresh),
-            "/api/v1/tenants/",
+            name=settings.JWT_CUSTOMER_REFRESH_COOKIE_NAME,
+            token=str(refresh),
+            path=CUSTOMER_COOKIE_PATH,
         )
         return response
 
 
-class CustomerLogoutView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request: Request, tenant_slug: str) -> Response:
-        encoded_token = request.COOKIES.get(settings.JWT_CUSTOMER_REFRESH_COOKIE_NAME)
-        if encoded_token:
-            try:
-                RefreshToken(encoded_token).blacklist()  # type: ignore[arg-type]
-            except TokenError:
-                pass
-
-        response = Response(status=status.HTTP_204_NO_CONTENT)
-        response.delete_cookie(
-            settings.JWT_CUSTOMER_REFRESH_COOKIE_NAME,
-            path="/api/v1/tenants/",
-            samesite="Lax",
-        )
-        return response
+class CustomerLogoutView(RefreshCookieLogoutView):
+    refresh_cookie_name = settings.JWT_CUSTOMER_REFRESH_COOKIE_NAME
+    refresh_cookie_path = CUSTOMER_COOKIE_PATH
 
 
 class CustomerCurrentUserView(APIView):

@@ -36,7 +36,6 @@ def test_customer_can_signup_login_refresh_get_current_user_and_logout(
         data={
             "email": "buyer@example.com",
             "password": PASSWORD,
-            "password_confirmation": PASSWORD,
         },
     )
 
@@ -105,7 +104,6 @@ def test_same_customer_email_is_independent_per_tenant(client):
     payload = {
         "email": "buyer@example.com",
         "password": PASSWORD,
-        "password_confirmation": PASSWORD,
     }
 
     assert (
@@ -139,7 +137,6 @@ def test_duplicate_customer_email_is_rejected_within_tenant(client, active_tenan
         data={
             "email": "BUYER@example.com",
             "password": PASSWORD,
-            "password_confirmation": PASSWORD,
         },
     )
 
@@ -172,7 +169,10 @@ def test_platform_and_customer_login_are_role_isolated(client, active_tenant):
 
     assert owner_on_customer.status_code == 401
     assert customer_on_platform.status_code == 401
-    assert owner_on_customer.json() == {"detail": "Invalid email or password."}
+    assert owner_on_customer.json() == {
+        "detail": "Invalid email or password.",
+        "code": "no_active_account",
+    }
 
     customer_login = client.post(
         customer_url("customer-auth-login", active_tenant),
@@ -225,7 +225,6 @@ def test_non_active_tenant_rejects_customer_auth(client, tenant_status):
         data={
             "email": "buyer@example.com",
             "password": PASSWORD,
-            "password_confirmation": PASSWORD,
         },
     )
     login = client.post(
@@ -293,7 +292,10 @@ def test_customer_login_has_generic_error_and_is_throttled(client, active_tenant
     ]
 
     assert all(response.status_code == 401 for response in responses[:5])
-    assert responses[0].json() == {"detail": "Invalid email or password."}
+    assert responses[0].json() == {
+        "detail": "Invalid email or password.",
+        "code": "no_active_account",
+    }
     assert responses[5].status_code == 429
 
 
@@ -306,7 +308,6 @@ def test_customer_signup_is_throttled_per_tenant_and_ip(client, active_tenant):
             data={
                 "email": f"buyer{index}@example.com",
                 "password": PASSWORD,
-                "password_confirmation": PASSWORD,
             },
         )
         for index in range(4)
