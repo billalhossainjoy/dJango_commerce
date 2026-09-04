@@ -48,7 +48,7 @@ def test_user_can_signup_login_refresh_and_logout(client):
     assert login_response.status_code == 200
     assert login_response.json()["access"]
     assert "refresh" not in login_response.json()
-    refresh_cookie = login_response.cookies["refresh_token"]
+    refresh_cookie = login_response.cookies["platform_refresh_token"]
     assert refresh_cookie["httponly"]
     assert refresh_cookie["samesite"] == "Lax"
 

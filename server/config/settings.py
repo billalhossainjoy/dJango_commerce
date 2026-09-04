@@ -162,13 +162,20 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_THROTTLE_RATES": {
+        "customer_login": "5/minute",
+        "customer_signup": "3/hour",
+    },
 }
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
-JWT_REFRESH_COOKIE_NAME = "refresh_token"
-JWT_REFRESH_COOKIE_MAX_AGE = int(SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
+JWT_PLATFORM_REFRESH_COOKIE_NAME = "platform_refresh_token"
+JWT_CUSTOMER_REFRESH_COOKIE_NAME = "customer_refresh_token"
+JWT_REFRESH_COOKIE_MAX_AGE = int(timedelta(days=7).total_seconds())
 JWT_REFRESH_COOKIE_SECURE = not DEBUG

@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
 from tenancy.models import Tenant, TenantHostname, TenantOwner
@@ -27,6 +28,70 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             return None
 
         return TenantSummarySerializer(ownership.tenant).data
+
+
+class CustomerSerializer(serializers.ModelSerializer):
+    tenant = TenantSummarySerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ("id", "email", "account_type", "tenant")
+
+
+class CustomerSignupSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    password_confirmation = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ("id", "email", "password", "password_confirmation")
+        read_only_fields = ("id",)
+
+    def validate_email(self, value: str) -> str:
+        email: str = User.objects.normalize_email(value).casefold()
+        tenant = self.context["tenant"]
+        if User.objects.filter(
+            email__iexact=email,
+            account_type=User.AccountType.CUSTOMER,
+            tenant=tenant,
+        ).exists():
+            raise serializers.ValidationError("An account with this email exists.")
+        return email
+
+    def validate_password(self, value: str) -> str:
+        validate_password(value)
+        return value
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirmation"]:
+            raise serializers.ValidationError(
+                {"password_confirmation": "Passwords do not match."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("password_confirmation")
+        return User.objects.create_user(
+            **validated_data,
+            tenant=self.context["tenant"],
+            account_type=User.AccountType.CUSTOMER,
+        )
+
+
+class CustomerLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+
+def customer_refresh_token(user: User) -> RefreshToken:
+    if user.account_type != User.AccountType.CUSTOMER or user.tenant is None:
+        raise ValueError("Customer tokens require a tenant-scoped customer.")
+
+    token = RefreshToken.for_user(user)
+    token["account_type"] = User.AccountType.CUSTOMER
+    token["tenant_id"] = str(user.tenant.id)
+    token["tenant_slug"] = user.tenant.slug
+    return token
 
 
 class SignupSerializer(serializers.ModelSerializer):
