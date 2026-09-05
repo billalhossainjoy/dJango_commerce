@@ -5,9 +5,9 @@ application. Django provides the authoritative API and business rules, while
 Next.js provides tenant storefronts, tenant administration, and platform
 administration from one shared deployment.
 
-The project is currently at the foundation stage. The development environment
-works, but tenant, identity, catalog, billing, domain, and order features have
-not been implemented yet.
+The project is currently at the foundation stage. The initial tenant and custom
+user models exist, while hostname resolution, catalog, billing, domain, and
+order features have not been implemented yet.
 
 ## Architecture direction
 
@@ -34,6 +34,14 @@ PostgreSQL runs as a separate Docker Compose service with persistent local data.
 The container keeps its Python virtual environment outside the bind-mounted
 repository, so it does not overwrite a host-specific `server/.venv`.
 
+The committed VS Code configuration provides Python and Django completion,
+import discovery, formatting, linting, tests, debugging, and balanced static
+type checking for Django and Django REST Framework. In the devcontainer the
+Python interpreter is selected automatically. For local editing, run
+`uv sync --project server --locked`, then select `server/.venv/bin/python` (or
+`server\\.venv\\Scripts\\python.exe` on Windows) with **Python: Select
+Interpreter** once.
+
 ## Start development
 
 1. Open this repository in VS Code.
@@ -45,11 +53,6 @@ repository, so it does not overwrite a host-specific `server/.venv`.
    uv run --project server python server/manage.py migrate
    uv run --project server python server/manage.py runserver 0.0.0.0:8000
    ```
-
-   The repository does not yet have its required custom user model. Existing
-   local database data is disposable: create the custom user model at the start
-   of Phase 1 and recreate the local database before treating migrations or data
-   as durable.
 
 5. Start the frontend in another terminal:
 
@@ -68,11 +71,21 @@ production.
 
 ## Verify the baseline
 
-Run these commands before and after foundation changes:
+The MVP uses risk-based testing to keep delivery fast. Run lint, formatting,
+configuration, migration, and frontend build checks continuously. Add automated
+tests during MVP only for release-blocking risks such as tenant isolation,
+authorization boundaries, authoritative order totals, and payment/webhook
+idempotency. Broader regression coverage is a post-demo hardening task.
+
+Run these commands before merging foundation changes:
 
 ```bash
+uv run --project server ruff check server
+uv run --project server ruff format --check server
+env -u DATABASE_URL DJANGO_ENVIRONMENT=test uv run --project server mypy --config-file server/pyproject.toml server
 uv run --project server python server/manage.py check
 uv run --project server python server/manage.py makemigrations --check --dry-run
+env -u DATABASE_URL DJANGO_ENVIRONMENT=test uv run --project server pytest server
 pnpm --dir client lint
 pnpm --dir client build
 ```

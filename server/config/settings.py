@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -15,6 +16,8 @@ ENV_FILE = Path(
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, []),
+    CORS_ALLOWED_ORIGINS=(list, []),
+    CORS_ALLOWED_ORIGIN_REGEXES=(list, []),
     DATABASE_CONN_MAX_AGE=(int, 0),
 )
 
@@ -31,6 +34,12 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+PLATFORM_ROOT_DOMAIN = env("PLATFORM_ROOT_DOMAIN", default="localhost")
+
+CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
+CORS_ALLOWED_ORIGIN_REGEXES = env("CORS_ALLOWED_ORIGIN_REGEXES")
+CORS_ALLOW_CREDENTIALS = True
+CORS_URLS_REGEX = r"^/api/.*$"
 
 
 # Application definition
@@ -42,10 +51,17 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
+    "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "tenancy",
+    "accounts",
+    "catalog",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -129,3 +145,40 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
+
+
+AUTH_USER_MODEL = "accounts.User"
+
+AUTHENTICATION_BACKENDS = [
+    "accounts.backends.PlatformAuthenticationBackend",
+]
+
+# Email uniqueness is enforced by conditional database constraints: globally for
+# platform users and per tenant for customers. The platform authentication
+# backend applies the matching account-type scope before looking up a user.
+SILENCED_SYSTEM_CHECKS = ["auth.W004"]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "tenant_login": "5/minute",
+        "customer_signup": "3/hour",
+    },
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
+JWT_PLATFORM_REFRESH_COOKIE_NAME = "platform_refresh_token"
+JWT_CUSTOMER_REFRESH_COOKIE_NAME = "customer_refresh_token"
+JWT_REFRESH_COOKIE_MAX_AGE = int(timedelta(days=7).total_seconds())
+JWT_REFRESH_COOKIE_SECURE = not DEBUG
+JWT_PLATFORM_REFRESH_COOKIE_DOMAIN = (
+    env.str("JWT_PLATFORM_REFRESH_COOKIE_DOMAIN", default="") or None
+)
