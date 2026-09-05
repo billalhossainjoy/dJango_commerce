@@ -1,36 +1,31 @@
 import type { Metadata } from "next";
 
 import { LoginForm } from "@/app/(auth)/login/login-form";
+import { TenantLogin } from "@/app/(auth)/login/tenant-login";
+import { GuestOnly } from "@/components/auth/guest-only";
 import { getHostRoute } from "@/lib/host-route";
 
 export const metadata: Metadata = {
   title: "Log in",
 };
 
-function safeNext(value: string | string[] | undefined): string {
-  if (
-    typeof value !== "string" ||
-    !value.startsWith("/") ||
-    value.startsWith("//")
-  ) {
-    return "/";
-  }
-  return value;
-}
-
-export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const [route, query] = await Promise.all([getHostRoute(), searchParams]);
+export default async function LoginPage() {
+  const route = await getHostRoute();
   const tenantSlug = route.kind === "tenant" ? route.tenantSlug : null;
 
+  if (tenantSlug) {
+    return <TenantLogin tenantSlug={tenantSlug} />;
+  }
+
   return (
-    <>
+    <GuestOnly>
       <h1 className="mt-4 text-2xl font-semibold">
-        {tenantSlug ? "Customer login" : "Store owner login"}
+        Store owner login
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Enter your details to continue.
       </p>
-      <LoginForm tenantSlug={tenantSlug} nextPath={safeNext(query.next)} />
-    </>
+      <LoginForm tenantSlug={null} />
+    </GuestOnly>
   );
 }

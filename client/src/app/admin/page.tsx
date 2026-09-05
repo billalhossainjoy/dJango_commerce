@@ -21,7 +21,9 @@ export default function AdminDashboardPage() {
       appService.activateTenant(currentUser.data!.tenant!.slug, accessToken!),
     onSuccess: (tenant) => {
       queryClient.setQueryData<CurrentUser>(currentUserQueryKey, (user) =>
-        user ? { ...user, tenant } : user,
+        user?.tenant
+          ? { ...user, tenant: { ...user.tenant, ...tenant } }
+          : user,
       );
     },
   });

@@ -7,6 +7,15 @@ export type TenantContext = {
   status: string;
 };
 
+export type OwnedTenantContext = TenantContext & {
+  canonical_hostname: string | null;
+};
+
+export type TenantLoginContext = {
+  slug: string;
+  name: string;
+};
+
 export type AuthTokens = {
   access: string;
 };
@@ -15,7 +24,7 @@ export type CurrentUser = {
   id: string;
   email: string;
   account_type: "platform" | "customer";
-  tenant: TenantContext | null;
+  tenant: OwnedTenantContext | null;
 };
 
 export type LoginInput = {
@@ -34,7 +43,7 @@ export type SignupInput = {
 export type SignupResult = {
   id: string;
   email: string;
-  tenant: TenantContext;
+  tenant: OwnedTenantContext;
 };
 
 export class AppService {
@@ -68,6 +77,22 @@ export class AppService {
     try {
       return await apiRequest<TenantContext>(
         `/api/v1/tenants/${encodedSlug}/`,
+        { signal },
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
+  async getTenantLoginContext(
+    tenantSlug: string,
+    signal?: AbortSignal,
+  ): Promise<TenantLoginContext | null> {
+    const encodedSlug = encodeURIComponent(tenantSlug);
+    try {
+      return await apiRequest<TenantLoginContext>(
+        `/api/v1/tenants/${encodedSlug}/owner-login-context/`,
         { signal },
       );
     } catch (error) {

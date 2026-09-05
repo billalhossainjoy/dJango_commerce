@@ -2,6 +2,10 @@ import { apiRequest } from "@/lib/api-client";
 
 export type CustomerAuthTokens = { access: string };
 
+export type TenantLoginResult = CustomerAuthTokens & {
+  account_type: "platform" | "customer";
+};
+
 export type Customer = {
   id: string;
   email: string;
@@ -22,12 +26,12 @@ export class CustomerAuthService {
   signup(tenantSlug: string, email: string, password: string) {
     return apiRequest<Customer>(`${this.basePath(tenantSlug)}/signup/`, {
       method: "POST",
-      body: { email, password, password_confirmation: password },
+      body: { email, password },
     });
   }
 
   login(tenantSlug: string, email: string, password: string) {
-    return apiRequest<CustomerAuthTokens>(`${this.basePath(tenantSlug)}/login/`, {
+    return apiRequest<TenantLoginResult>(`${this.basePath(tenantSlug)}/login/`, {
       method: "POST",
       body: { email, password },
     });

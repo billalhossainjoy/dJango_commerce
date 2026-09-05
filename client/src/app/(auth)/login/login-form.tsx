@@ -10,7 +10,7 @@ import { FormInput } from "@/components/ui/form-input";
 import { Button } from "@/components/ui/button";
 import { FieldError, FieldGroup } from "@/components/ui/field";
 import { useAuth } from "@/hooks/use-auth";
-import { useCustomerAuth } from "@/hooks/use-customer-auth";
+import { useTenantLogin } from "@/hooks/use-tenant-login";
 import { getApiErrorMessage } from "@/lib/api-client";
 
 const loginSchema = z.object({
@@ -22,14 +22,12 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export function LoginForm({
   tenantSlug,
-  nextPath,
 }: {
   tenantSlug: string | null;
-  nextPath: string;
 }) {
   const router = useRouter();
   const platformAuth = useAuth();
-  const customerAuth = useCustomerAuth(tenantSlug ?? "");
+  const tenantLogin = useTenantLogin(tenantSlug ?? "");
   const {
     register,
     handleSubmit,
@@ -43,8 +41,10 @@ export function LoginForm({
   const submitLogin = handleSubmit(async ({ email, password }) => {
     try {
       if (tenantSlug) {
-        await customerAuth.login({ email, password });
-        router.replace(nextPath);
+        const result = await tenantLogin.mutateAsync({ email, password });
+        router.replace(
+          result.account_type === "platform" ? "/admin" : "/account",
+        );
       } else {
         await platformAuth.login({ email, password });
         router.replace("/admin");
@@ -62,7 +62,7 @@ export function LoginForm({
   return (
     <>
       <form className="mt-8" onSubmit={submitLogin}>
-        <FieldGroup> 
+        <FieldGroup>
           <FormInput
             id="email"
             label="Email"
@@ -91,7 +91,10 @@ export function LoginForm({
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Need an account?{" "}
-        <Link className="font-medium text-primary underline underline-offset-4 hover:text-primary/80" href="/signup">
+        <Link
+          className="font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+          href="/signup"
+        >
           Sign up
         </Link>
       </p>

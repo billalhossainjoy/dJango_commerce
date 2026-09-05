@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { SignupForm } from "@/app/(auth)/signup/signup-form";
 import { CustomerSignupForm } from "@/app/(auth)/signup/customer-signup-form";
+import { CustomerGuestOnly } from "@/components/auth/customer-guest-only";
+import { GuestOnly } from "@/components/auth/guest-only";
 import { getHostRoute } from "@/lib/host-route";
 
 export const metadata: Metadata = {
@@ -13,7 +15,7 @@ export default async function SignupPage() {
   const route = await getHostRoute();
   const tenantSlug = route.kind === "tenant" ? route.tenantSlug : null;
 
-  return (
+  const content = (
     <>
       <h1 className="mt-4 text-2xl font-semibold">
         {tenantSlug ? "Create customer account" : "Create your store"}
@@ -33,5 +35,11 @@ export default async function SignupPage() {
         </Link>
       </p>
     </>
+  );
+
+  return tenantSlug ? (
+    <CustomerGuestOnly tenantSlug={tenantSlug}>{content}</CustomerGuestOnly>
+  ) : (
+    <GuestOnly>{content}</GuestOnly>
   );
 }

@@ -16,12 +16,11 @@ const signupSchema = z
     storeName: z.string().trim().min(1, "Store name is required."),
     slug: z
       .string()
-      .trim()
       .min(1, "Store URL is required.")
       .max(63, "Store URL must contain at most 63 characters.")
       .regex(
         /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-        "Use lowercase letters, numbers, and single hyphens.",
+        "Use only letters, numbers, and single hyphens between words. Spaces and symbols such as . @ # are not allowed.",
       ),
     email: z.email("Enter a valid email address."),
     password: z.string().min(8, "Password must contain at least 8 characters."),
@@ -51,6 +50,7 @@ export function SignupForm() {
     control,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<SignupValues>({
     resolver: zodResolver(signupSchema),
@@ -103,9 +103,18 @@ export function SignupForm() {
               autoComplete="off"
               autoCapitalize="none"
               spellCheck={false}
+              maxLength={63}
               aria-invalid={!!errors.slug}
               aria-describedby={`store-url-preview${errors.slug ? " store-slug-error" : ""}`}
-              {...register("slug")}
+              {...register("slug", {
+                onChange: (event) => {
+                  event.target.value = event.target.value.toLowerCase();
+                  setValue("slug", event.target.value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
+                },
+              })}
             />
             {rootDomain ? (
               <span className="flex shrink-0 items-center whitespace-nowrap rounded-r-md border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">

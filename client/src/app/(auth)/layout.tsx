@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-import { GuestOnly } from "@/components/auth/guest-only";
-import { CustomerGuestOnly } from "@/components/auth/customer-guest-only";
 import { getHostRoute } from "@/lib/host-route";
 import { CustomerAuthSession } from "@/providers/customer-auth-session";
 
@@ -18,10 +16,8 @@ export default async function AuthLayout({ children }: LayoutProps<"/">) {
         {tenantSlug ? <CustomerAuthSession tenantSlug={tenantSlug} /> : null}
         {route.kind === "unknown" ? (
           <p className="mt-6 text-sm text-destructive">Store unavailable.</p>
-        ) : tenantSlug ? (
-          <CustomerGuestOnly tenantSlug={tenantSlug}>{children}</CustomerGuestOnly>
         ) : (
-          <GuestOnly>{children}</GuestOnly>
+          children
         )}
       </section>
     </main>

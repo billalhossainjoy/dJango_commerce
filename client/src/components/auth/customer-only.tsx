@@ -17,7 +17,7 @@ export function CustomerOnly({
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace("/login?next=/account");
+      router.replace("/login");
     }
   }, [router, status]);
 
