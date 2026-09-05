@@ -17,11 +17,12 @@ from accounts.serializers import (
     CurrentUserSerializer,
     CustomerSerializer,
     CustomerSignupSerializer,
-    CustomerTokenObtainPairSerializer,
+    PlatformTokenObtainPairSerializer,
     SignupSerializer,
+    TenantTokenObtainPairSerializer,
     customer_refresh_token,
 )
-from accounts.throttles import CustomerLoginThrottle, CustomerSignupThrottle
+from accounts.throttles import CustomerSignupThrottle, TenantLoginThrottle
 from tenancy.models import Tenant
 
 PLATFORM_COOKIE_PATH = "/api/v1/auth/"
@@ -72,6 +73,8 @@ def move_refresh_to_cookie(response, *, name, path, domain=None):
 
 
 class LoginView(TokenObtainPairView):
+    serializer_class = PlatformTokenObtainPairSerializer
+
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         return move_refresh_to_cookie(
@@ -189,17 +192,27 @@ class CustomerSignupView(APIView):
         return Response(CustomerSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
-class CustomerLoginView(TokenObtainPairView):
-    serializer_class = CustomerTokenObtainPairSerializer
-    throttle_classes = [CustomerLoginThrottle]
+class TenantLoginView(TokenObtainPairView):
+    serializer_class = TenantTokenObtainPairSerializer
+    throttle_classes = [TenantLoginThrottle]
 
     def get_serializer_context(self):
         context = dict(super().get_serializer_context())
-        context["tenant"] = active_tenant(self.kwargs["tenant_slug"])
+        context["tenant"] = Tenant.objects.filter(
+            slug=self.kwargs["tenant_slug"]
+        ).first()
         return context
 
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
+        if response.data["account_type"] == User.AccountType.PLATFORM:
+            return move_refresh_to_cookie(
+                response,
+                name=settings.JWT_PLATFORM_REFRESH_COOKIE_NAME,
+                path=PLATFORM_COOKIE_PATH,
+                domain=settings.JWT_PLATFORM_REFRESH_COOKIE_DOMAIN,
+            )
+
         return move_refresh_to_cookie(
             response,
             name=settings.JWT_CUSTOMER_REFRESH_COOKIE_NAME,

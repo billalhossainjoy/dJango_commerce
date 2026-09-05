@@ -163,7 +163,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_THROTTLE_RATES": {
-        "customer_login": "5/minute",
+        "tenant_login": "5/minute",
         "customer_signup": "3/hour",
     },
 }

@@ -86,6 +86,31 @@ def test_login_rejects_wrong_password(client):
 
 
 @pytest.mark.django_db
+def test_platform_login_ignores_same_email_customer_on_another_tenant(client):
+    User.objects.create_user(
+        email="owner@example.com",
+        password="owner-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    tenant = Tenant.objects.create(slug="other", status=Tenant.Status.ACTIVE)
+    User.objects.create_user(
+        email="owner@example.com",
+        password="customer-password-123",
+        account_type=User.AccountType.CUSTOMER,
+        tenant=tenant,
+    )
+
+    response = client.post(
+        reverse("auth-login"),
+        data={"email": "owner@example.com", "password": "owner-password-123"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["access"]
+    assert response.cookies["platform_refresh_token"].value
+
+
+@pytest.mark.django_db
 @override_settings(JWT_PLATFORM_REFRESH_COOKIE_DOMAIN=".example.com")
 def test_platform_refresh_cookie_uses_configured_shared_domain(client):
     User.objects.create_user(

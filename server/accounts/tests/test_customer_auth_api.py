@@ -1,10 +1,12 @@
+import logging
+
 import pytest
 from django.core.cache import cache
 from django.urls import reverse
 from rest_framework_simplejwt.tokens import AccessToken
 
 from accounts.models import User
-from tenancy.models import Tenant
+from tenancy.models import Tenant, TenantOwner
 
 PASSWORD = "strong-test-password-123"
 
@@ -50,6 +52,7 @@ def test_customer_can_signup_login_refresh_get_current_user_and_logout(
     )
 
     assert login_response.status_code == 200
+    assert login_response.json()["account_type"] == User.AccountType.CUSTOMER
     access = login_response.json()["access"]
     claims = AccessToken(access)
     assert claims["account_type"] == User.AccountType.CUSTOMER
@@ -145,6 +148,54 @@ def test_duplicate_customer_email_is_rejected_within_tenant(client, active_tenan
 
 
 @pytest.mark.django_db
+def test_tenant_owner_email_cannot_register_as_customer(client, active_tenant):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.PLATFORM,
+    )
+    TenantOwner.objects.create(user=owner, tenant=active_tenant)
+
+    response = client.post(
+        customer_url("customer-auth-signup", active_tenant),
+        data={"email": "OWNER@example.com", "password": PASSWORD},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"email": ["An account with this email exists."]}
+    assert not User.objects.filter(
+        account_type=User.AccountType.CUSTOMER,
+        tenant=active_tenant,
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_tenant_owner_email_can_register_as_customer_elsewhere(client, active_tenant):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.PLATFORM,
+    )
+    TenantOwner.objects.create(user=owner, tenant=active_tenant)
+    other_tenant = Tenant.objects.create(
+        slug="other",
+        status=Tenant.Status.ACTIVE,
+    )
+
+    response = client.post(
+        customer_url("customer-auth-signup", other_tenant),
+        data={"email": "owner@example.com", "password": PASSWORD},
+    )
+
+    assert response.status_code == 201
+    assert User.objects.filter(
+        email="owner@example.com",
+        account_type=User.AccountType.CUSTOMER,
+        tenant=other_tenant,
+    ).exists()
+
+
+@pytest.mark.django_db
 def test_platform_and_customer_login_are_role_isolated(client, active_tenant):
     User.objects.create_user(
         email="owner@example.com",
@@ -187,6 +238,116 @@ def test_platform_and_customer_login_are_role_isolated(client, active_tenant):
 
 
 @pytest.mark.django_db
+def test_tenant_owner_can_login_on_their_tenant(client, active_tenant):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.PLATFORM,
+    )
+    TenantOwner.objects.create(user=owner, tenant=active_tenant)
+
+    response = client.post(
+        customer_url("customer-auth-login", active_tenant),
+        data={"email": owner.email, "password": PASSWORD},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["account_type"] == User.AccountType.PLATFORM
+    assert response.json()["access"]
+    assert "refresh" not in response.json()
+    assert response.cookies["platform_refresh_token"].value
+    assert "customer_refresh_token" not in response.cookies
+
+
+@pytest.mark.django_db
+def test_tenant_owner_cannot_login_on_another_tenant(client, active_tenant):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.PLATFORM,
+    )
+    owned_tenant = Tenant.objects.create(slug="owned", status=Tenant.Status.ACTIVE)
+    TenantOwner.objects.create(user=owner, tenant=owned_tenant)
+
+    response = client.post(
+        customer_url("customer-auth-login", active_tenant),
+        data={"email": owner.email, "password": PASSWORD},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid email or password.",
+        "code": "no_active_account",
+    }
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "tenant_status",
+    [Tenant.Status.PROVISIONING, Tenant.Status.SUSPENDED, Tenant.Status.CLOSED],
+)
+def test_tenant_owner_can_login_when_tenant_is_inactive(client, tenant_status):
+    tenant = Tenant.objects.create(slug="demo", status=tenant_status)
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.PLATFORM,
+    )
+    TenantOwner.objects.create(user=owner, tenant=tenant)
+
+    response = client.post(
+        customer_url("customer-auth-login", tenant),
+        data={"email": owner.email, "password": PASSWORD},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["account_type"] == User.AccountType.PLATFORM
+
+
+@pytest.mark.django_db
+def test_ambiguous_tenant_login_fails_closed(client, active_tenant, caplog):
+    owner = User.objects.create_user(
+        email="shared@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.PLATFORM,
+    )
+    TenantOwner.objects.create(user=owner, tenant=active_tenant)
+    User.objects.create_user(
+        email="shared@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.CUSTOMER,
+        tenant=active_tenant,
+    )
+
+    with caplog.at_level(logging.ERROR):
+        response = client.post(
+            customer_url("customer-auth-login", active_tenant),
+            data={"email": "shared@example.com", "password": PASSWORD},
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid email or password.",
+        "code": "no_active_account",
+    }
+    assert "Ambiguous tenant login identities" in caplog.messages
+
+
+@pytest.mark.django_db
+def test_unknown_tenant_login_fails_generically(client):
+    response = client.post(
+        reverse("customer-auth-login", kwargs={"tenant_slug": "unknown"}),
+        data={"email": "owner@example.com", "password": PASSWORD},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid email or password.",
+        "code": "no_active_account",
+    }
+
+
+@pytest.mark.django_db
 def test_customer_token_cannot_cross_tenant_boundary(client):
     first = Tenant.objects.create(slug="first", status=Tenant.Status.ACTIVE)
     second = Tenant.objects.create(slug="second", status=Tenant.Status.ACTIVE)
@@ -219,6 +380,12 @@ def test_customer_token_cannot_cross_tenant_boundary(client):
 )
 def test_non_active_tenant_rejects_customer_auth(client, tenant_status):
     tenant = Tenant.objects.create(slug="demo", status=tenant_status)
+    User.objects.create_user(
+        email="buyer@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.CUSTOMER,
+        tenant=tenant,
+    )
 
     signup = client.post(
         customer_url("customer-auth-signup", tenant),
@@ -235,7 +402,11 @@ def test_non_active_tenant_rejects_customer_auth(client, tenant_status):
     logout = client.post(customer_url("customer-auth-logout", tenant))
 
     assert signup.status_code == 404
-    assert login.status_code == 404
+    assert login.status_code == 401
+    assert login.json() == {
+        "detail": "Invalid email or password.",
+        "code": "no_active_account",
+    }
     assert refresh.status_code == 404
     assert logout.status_code == 204
 
@@ -279,7 +450,7 @@ def test_platform_and_customer_refresh_cookies_coexist(client, active_tenant):
 
 
 @pytest.mark.django_db
-def test_customer_login_has_generic_error_and_is_throttled(client, active_tenant):
+def test_tenant_login_has_generic_error_and_is_throttled(client, active_tenant):
     cache.clear()
     url = customer_url("customer-auth-login", active_tenant)
 

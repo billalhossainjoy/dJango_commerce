@@ -10,8 +10,8 @@ class TenantIPThrottle(SimpleRateThrottle):
         }
 
 
-class CustomerLoginThrottle(TenantIPThrottle):
-    scope = "customer_login"
+class TenantLoginThrottle(TenantIPThrottle):
+    scope = "tenant_login"
 
 
 class CustomerSignupThrottle(TenantIPThrottle):

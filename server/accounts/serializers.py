@@ -3,6 +3,7 @@ import logging
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -69,11 +70,14 @@ class CustomerSignupSerializer(serializers.ModelSerializer):
     def validate_email(self, value: str) -> str:
         email: str = User.objects.normalize_email(value).casefold()
         tenant = self.context["tenant"]
-        if User.objects.filter(
-            email__iexact=email,
-            account_type=User.AccountType.CUSTOMER,
-            tenant=tenant,
-        ).exists():
+        email_is_taken = User.objects.filter(email__iexact=email).filter(
+            Q(account_type=User.AccountType.CUSTOMER, tenant=tenant)
+            | Q(
+                account_type=User.AccountType.PLATFORM,
+                tenant_ownerships__tenant=tenant,
+            )
+        )
+        if email_is_taken.exists():
             raise serializers.ValidationError("An account with this email exists.")
         return email
 
@@ -100,7 +104,7 @@ def customer_refresh_token(user: User) -> RefreshToken:
     return token
 
 
-class CustomerTokenObtainPairSerializer(TokenObtainPairSerializer):
+class TenantTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = User.USERNAME_FIELD
     default_error_messages = {
         "no_active_account": "Invalid email or password.",
@@ -110,23 +114,91 @@ class CustomerTokenObtainPairSerializer(TokenObtainPairSerializer):
         tenant = self.context["tenant"]
         email = User.objects.normalize_email(attrs["email"]).casefold()
         password = attrs["password"]
-        user = User.objects.filter(
-            email__iexact=email,
-            account_type=User.AccountType.CUSTOMER,
-            tenant=tenant,
-        ).first()
+        customer = None
+        owner = None
+        if tenant is not None:
+            customer = User.objects.filter(
+                email__iexact=email,
+                account_type=User.AccountType.CUSTOMER,
+                tenant=tenant,
+            ).first()
+            owner = User.objects.filter(
+                email__iexact=email,
+                account_type=User.AccountType.PLATFORM,
+                tenant_ownerships__tenant=tenant,
+            ).first()
 
-        if user is None:
-            User().set_password(password)
+        customer_matches = _password_matches(customer, password) and (
+            tenant is not None and tenant.status == Tenant.Status.ACTIVE
+        )
+        owner_matches = _password_matches(owner, password)
+        matches = [
+            user
+            for user, matches_password in (
+                (customer, customer_matches),
+                (owner, owner_matches),
+            )
+            if user is not None and matches_password
+        ]
 
-        if user is None or not user.check_password(password) or not user.is_active:
-            logger.warning("Customer login failed", extra={"tenant_slug": tenant.slug})
+        if len(matches) != 1:
+            if len(matches) > 1:
+                logger.error(
+                    "Ambiguous tenant login identities",
+                    extra={"tenant_slug": tenant.slug if tenant else None},
+                )
+            else:
+                logger.warning(
+                    "Tenant login failed",
+                    extra={"tenant_slug": tenant.slug if tenant else None},
+                )
             raise AuthenticationFailed(
                 str(self.error_messages["no_active_account"]),
                 "no_active_account",
             )
 
-        refresh = customer_refresh_token(user)
+        user = matches[0]
+        refresh = (
+            customer_refresh_token(user)
+            if user.account_type == User.AccountType.CUSTOMER
+            else RefreshToken.for_user(user)
+        )
+        return {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "account_type": user.account_type,
+        }
+
+
+def _password_matches(user: User | None, password: str) -> bool:
+    if user is None:
+        User().set_password(password)
+        return False
+
+    password_matches = user.check_password(password)
+    return user.is_active and password_matches
+
+
+class PlatformTokenObtainPairSerializer(TokenObtainPairSerializer):
+    username_field = User.USERNAME_FIELD
+    default_error_messages = {
+        "no_active_account": "Invalid email or password.",
+    }
+
+    def validate(self, attrs):
+        email = User.objects.normalize_email(attrs["email"]).casefold()
+        user = User.objects.filter(
+            email__iexact=email,
+            account_type=User.AccountType.PLATFORM,
+        ).first()
+        if not _password_matches(user, attrs["password"]):
+            raise AuthenticationFailed(
+                str(self.error_messages["no_active_account"]),
+                "no_active_account",
+            )
+
+        assert user is not None
+        refresh = RefreshToken.for_user(user)
         return {"refresh": str(refresh), "access": str(refresh.access_token)}
 
 
