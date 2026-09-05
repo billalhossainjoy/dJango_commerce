@@ -3,15 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { adminNavigation } from "@/components/admin/navigation";
 import { cn } from "@/lib/utils";
-
-const navigation = [
-  { href: "/admin", label: "Overview", icon: "grid" },
-  { href: "/admin/products", label: "Products", icon: "box" },
-  { href: "/admin/orders", label: "Orders", icon: "receipt" },
-  { href: "/admin/customers", label: "Customers", icon: "users" },
-  { href: "/admin/settings", label: "Settings", icon: "settings" },
-];
 
 function NavIcon({ name }: { name: string }) {
   const paths: Record<string, React.ReactNode> = {
@@ -28,7 +21,7 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden min-h-screen shrink-0 bg-[#111827] text-white md:block md:w-64">
+    <aside className="sticky top-0 hidden h-screen shrink-0 overflow-y-auto bg-[#111827] text-white md:block md:w-64">
       <div className="flex items-center gap-3 px-5 py-6">
         <span className="grid size-10 place-items-center rounded-xl bg-indigo-500 text-lg font-bold shadow-lg shadow-indigo-950/30">S</span>
         <div>
@@ -41,7 +34,7 @@ export function AdminSidebar() {
         aria-label="Tenant administration"
         className="flex gap-1 overflow-x-auto px-3 pb-4 md:flex-col md:px-4 md:pb-6"
       >
-        {navigation.map((item) => {
+        {adminNavigation.map((item) => {
           const isActive =
             item.href === "/admin"
               ? pathname === item.href

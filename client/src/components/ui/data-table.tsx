@@ -8,9 +8,13 @@ import {
   createColumnHelper,
   createFilteredRowModel,
   createPaginatedRowModel,
+  createSortedRowModel,
   filterFn_equalsString,
   filterFn_includesString,
   rowPaginationFeature,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_text,
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
@@ -24,6 +28,12 @@ const dataTableFeatures = tableFeatures({
   filterFns: {
     equalsString: filterFn_equalsString,
     includesString: filterFn_includesString,
+  },
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: {
+    alphanumeric: sortFn_alphanumeric,
+    text: sortFn_text,
   },
   rowPaginationFeature,
   paginatedRowModel: createPaginatedRowModel(),
@@ -79,10 +89,12 @@ export function DataTable<TData extends RowData>({
       initialState: {
         pagination: { pageIndex: 0, pageSize: initialPageSize },
       },
+      enableMultiSort: false,
     },
     (state) => ({
       columnFilters: state.columnFilters,
       pagination: state.pagination,
+      sorting: state.sorting,
     }),
   );
   const searchColumn = search ? table.getColumn(search.columnId) : undefined;
@@ -138,17 +150,43 @@ export function DataTable<TData extends RowData>({
             <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th
-                      className="px-5 py-3 font-semibold first:sm:px-6 last:sm:px-6"
-                      key={header.id}
-                      scope="col"
-                    >
-                      {header.isPlaceholder ? null : (
-                        <table.FlexRender header={header} />
-                      )}
-                    </th>
-                  ))}
+                  {headerGroup.headers.map((header) => {
+                    const sortDirection = header.column.getIsSorted();
+                    return (
+                      <th
+                        aria-sort={
+                          sortDirection === "asc"
+                            ? "ascending"
+                            : sortDirection === "desc"
+                              ? "descending"
+                              : undefined
+                        }
+                        className="px-5 py-3 font-semibold first:sm:px-6 last:sm:px-6"
+                        key={header.id}
+                        scope="col"
+                      >
+                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                          <button
+                            className="inline-flex items-center gap-1.5 rounded-sm text-left outline-none hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-500/30"
+                            onClick={header.column.getToggleSortingHandler()}
+                            title="Sort column"
+                            type="button"
+                          >
+                            <table.FlexRender header={header} />
+                            <span aria-hidden="true" className="text-slate-400">
+                              {sortDirection === "asc"
+                                ? "↑"
+                                : sortDirection === "desc"
+                                  ? "↓"
+                                  : "↕"}
+                            </span>
+                          </button>
+                        ) : (
+                          <table.FlexRender header={header} />
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
               ))}
             </thead>

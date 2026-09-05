@@ -4,16 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DropdownMenu } from "radix-ui";
 
+import { adminNavigation } from "@/components/admin/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { cn } from "@/lib/utils";
-
-const mobileNavigation = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/products", label: "Products" },
-  { href: "/admin/orders", label: "Orders" },
-  { href: "/admin/customers", label: "Customers" },
-];
 
 export function AdminHeader() {
   const { logout } = useAuth();
@@ -76,7 +70,7 @@ export function AdminHeader() {
         </div>
       </div>
       <nav className="flex gap-1 overflow-x-auto border-t border-slate-100 px-3 py-2 md:hidden" aria-label="Admin navigation">
-        {mobileNavigation.map((item) => {
+        {adminNavigation.map((item) => {
           const active = item.href === "/admin"
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -84,6 +78,7 @@ export function AdminHeader() {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "shrink-0 rounded-lg px-3 py-2 text-sm font-medium",
                 active ? "bg-indigo-50 text-indigo-700" : "text-slate-500",
