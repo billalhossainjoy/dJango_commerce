@@ -20,7 +20,7 @@ from accounts.serializers import (
     PlatformTokenObtainPairSerializer,
     SignupSerializer,
     TenantTokenObtainPairSerializer,
-    customer_refresh_token,
+    refresh_token_for,
 )
 from accounts.throttles import CustomerSignupThrottle, TenantLoginThrottle
 from tenancy.models import Tenant
@@ -247,7 +247,7 @@ class CustomerRefreshView(APIView):
                 is_active=True,
             )
             old_refresh.blacklist()
-            refresh = customer_refresh_token(user)
+            refresh = refresh_token_for(user)
         except TokenError, User.DoesNotExist, KeyError:
             return Response(
                 {"detail": "Refresh token is invalid."},

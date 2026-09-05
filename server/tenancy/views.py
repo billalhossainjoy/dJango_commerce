@@ -7,15 +7,7 @@ from rest_framework.response import Response
 
 from accounts.models import User
 from tenancy.models import Tenant
-
-
-def tenant_response(tenant: Tenant) -> dict[str, str]:
-    return {
-        "id": str(tenant.id),
-        "slug": tenant.slug,
-        "name": tenant.name,
-        "status": tenant.status,
-    }
+from tenancy.serializers import TenantLoginContextSerializer, TenantSummarySerializer
 
 
 @api_view(["GET"])
@@ -28,7 +20,7 @@ def tenant_context(request: Request, tenant_slug: str) -> Response:
     if tenant is None:
         return Response({"detail": "Tenant not found."}, status=404)
 
-    return Response(tenant_response(tenant))
+    return Response(TenantSummarySerializer(tenant).data)
 
 
 @api_view(["GET"])
@@ -38,7 +30,7 @@ def owner_login_context(request: Request, tenant_slug: str) -> Response:
     if tenant is None:
         return Response({"detail": "Tenant not found."}, status=404)
 
-    return Response({"slug": tenant.slug, "name": tenant.name})
+    return Response(TenantLoginContextSerializer(tenant).data)
 
 
 @api_view(["POST"])
@@ -63,4 +55,4 @@ def activate_tenant(request: Request, tenant_slug: str) -> Response:
         tenant.status = Tenant.Status.ACTIVE
         tenant.save(update_fields=["status", "updated_at"])
 
-    return Response(tenant_response(tenant))
+    return Response(TenantSummarySerializer(tenant).data)

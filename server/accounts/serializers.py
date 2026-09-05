@@ -11,29 +11,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
 from tenancy.models import Tenant, TenantHostname, TenantOwner
+from tenancy.serializers import OwnerTenantSummarySerializer, TenantSummarySerializer
 
 logger = logging.getLogger(__name__)
-
-
-class TenantSummarySerializer(serializers.Serializer):
-    id = serializers.UUIDField(read_only=True)
-    slug = serializers.SlugField(read_only=True)
-    name = serializers.CharField(read_only=True)
-    status = serializers.CharField(read_only=True)
-
-
-class OwnerTenantSummarySerializer(TenantSummarySerializer):
-    canonical_hostname = serializers.SerializerMethodField()
-
-    def get_canonical_hostname(self, tenant: Tenant) -> str | None:
-        return (
-            tenant.hostnames.filter(
-                is_canonical=True,
-                is_active=True,
-            )
-            .values_list("hostname", flat=True)
-            .first()
-        )
 
 
 class CurrentUserSerializer(serializers.ModelSerializer):
@@ -93,23 +73,30 @@ class CustomerSignupSerializer(serializers.ModelSerializer):
         )
 
 
-def customer_refresh_token(user: User) -> RefreshToken:
-    if user.account_type != User.AccountType.CUSTOMER or user.tenant is None:
-        raise ValueError("Customer tokens require a tenant-scoped customer.")
-
+def refresh_token_for(user: User) -> RefreshToken:
     token = RefreshToken.for_user(user)
-    token["account_type"] = User.AccountType.CUSTOMER
-    token["tenant_id"] = str(user.tenant.id)
-    token["tenant_slug"] = user.tenant.slug
+    if user.account_type == User.AccountType.CUSTOMER:
+        if user.tenant is None:
+            raise ValueError("Customer tokens require a tenant.")
+        token["account_type"] = User.AccountType.CUSTOMER
+        token["tenant_id"] = str(user.tenant.id)
+        token["tenant_slug"] = user.tenant.slug
     return token
 
 
-class TenantTokenObtainPairSerializer(TokenObtainPairSerializer):
-    username_field = User.USERNAME_FIELD
-    default_error_messages = {
-        "no_active_account": "Invalid email or password.",
-    }
+def token_pair_for(user: User, *, include_account_type: bool = False):
+    refresh = refresh_token_for(user)
+    data = {"refresh": str(refresh), "access": str(refresh.access_token)}
+    if include_account_type:
+        data["account_type"] = user.account_type
+    return data
 
+
+def invalid_credentials() -> AuthenticationFailed:
+    return AuthenticationFailed("Invalid email or password.", "no_active_account")
+
+
+class TenantTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         tenant = self.context["tenant"]
         email = User.objects.normalize_email(attrs["email"]).casefold()
@@ -152,22 +139,10 @@ class TenantTokenObtainPairSerializer(TokenObtainPairSerializer):
                     "Tenant login failed",
                     extra={"tenant_slug": tenant.slug if tenant else None},
                 )
-            raise AuthenticationFailed(
-                str(self.error_messages["no_active_account"]),
-                "no_active_account",
-            )
+            raise invalid_credentials()
 
         user = matches[0]
-        refresh = (
-            customer_refresh_token(user)
-            if user.account_type == User.AccountType.CUSTOMER
-            else RefreshToken.for_user(user)
-        )
-        return {
-            "refresh": str(refresh),
-            "access": str(refresh.access_token),
-            "account_type": user.account_type,
-        }
+        return token_pair_for(user, include_account_type=True)
 
 
 def _password_matches(user: User | None, password: str) -> bool:
@@ -180,11 +155,6 @@ def _password_matches(user: User | None, password: str) -> bool:
 
 
 class PlatformTokenObtainPairSerializer(TokenObtainPairSerializer):
-    username_field = User.USERNAME_FIELD
-    default_error_messages = {
-        "no_active_account": "Invalid email or password.",
-    }
-
     def validate(self, attrs):
         email = User.objects.normalize_email(attrs["email"]).casefold()
         user = User.objects.filter(
@@ -192,14 +162,10 @@ class PlatformTokenObtainPairSerializer(TokenObtainPairSerializer):
             account_type=User.AccountType.PLATFORM,
         ).first()
         if not _password_matches(user, attrs["password"]):
-            raise AuthenticationFailed(
-                str(self.error_messages["no_active_account"]),
-                "no_active_account",
-            )
+            raise invalid_credentials()
 
         assert user is not None
-        refresh = RefreshToken.for_user(user)
-        return {"refresh": str(refresh), "access": str(refresh.access_token)}
+        return token_pair_for(user)
 
 
 class SignupSerializer(serializers.ModelSerializer):
