@@ -31,6 +31,16 @@ def tenant_context(request: Request, tenant_slug: str) -> Response:
     return Response(tenant_response(tenant))
 
 
+@api_view(["GET"])
+def owner_login_context(request: Request, tenant_slug: str) -> Response:
+    """Return the minimal public tenant identity needed by owner login."""
+    tenant = Tenant.objects.filter(slug=tenant_slug).only("slug", "name").first()
+    if tenant is None:
+        return Response({"detail": "Tenant not found."}, status=404)
+
+    return Response({"slug": tenant.slug, "name": tenant.name})
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def activate_tenant(request: Request, tenant_slug: str) -> Response:

@@ -1,4 +1,5 @@
 import pytest
+from django.test import override_settings
 from django.urls import reverse
 
 from accounts.models import User
@@ -38,6 +39,7 @@ def test_user_can_signup_login_refresh_and_logout(client):
         "slug": "demo",
         "name": "Demo Store",
         "status": Tenant.Status.PROVISIONING,
+        "canonical_hostname": "demo.localhost",
     }
 
     login_response = client.post(
@@ -51,6 +53,7 @@ def test_user_can_signup_login_refresh_and_logout(client):
     refresh_cookie = login_response.cookies["platform_refresh_token"]
     assert refresh_cookie["httponly"]
     assert refresh_cookie["samesite"] == "Lax"
+    assert refresh_cookie["domain"] == ""
 
     refresh_response = client.post(reverse("token-refresh"))
 
@@ -80,6 +83,32 @@ def test_login_rejects_wrong_password(client):
     )
 
     assert login_response.status_code == 401
+
+
+@pytest.mark.django_db
+@override_settings(JWT_PLATFORM_REFRESH_COOKIE_DOMAIN=".example.com")
+def test_platform_refresh_cookie_uses_configured_shared_domain(client):
+    User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+
+    login_response = client.post(
+        reverse("auth-login"),
+        data={
+            "email": "owner@example.com",
+            "password": "strong-test-password-123",
+        },
+    )
+    logout_response = client.post(reverse("auth-logout"))
+
+    assert login_response.cookies["platform_refresh_token"]["domain"] == (
+        ".example.com"
+    )
+    assert logout_response.cookies["platform_refresh_token"]["domain"] == (
+        ".example.com"
+    )
 
 
 @pytest.mark.django_db
@@ -114,6 +143,10 @@ def test_current_user_returns_owned_tenant(client):
         status=Tenant.Status.ACTIVE,
     )
     TenantOwner.objects.create(user=user, tenant=tenant)
+    TenantHostname.objects.create(
+        tenant=tenant,
+        hostname="demo.localhost",
+    )
     login_response = client.post(
         reverse("auth-login"),
         data={
@@ -137,6 +170,7 @@ def test_current_user_returns_owned_tenant(client):
             "slug": "demo",
             "name": "Demo Store",
             "status": Tenant.Status.ACTIVE,
+            "canonical_hostname": "demo.localhost",
         },
     }
 

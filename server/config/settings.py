@@ -179,3 +179,6 @@ JWT_PLATFORM_REFRESH_COOKIE_NAME = "platform_refresh_token"
 JWT_CUSTOMER_REFRESH_COOKIE_NAME = "customer_refresh_token"
 JWT_REFRESH_COOKIE_MAX_AGE = int(timedelta(days=7).total_seconds())
 JWT_REFRESH_COOKIE_SECURE = not DEBUG
+JWT_PLATFORM_REFRESH_COOKIE_DOMAIN = (
+    env.str("JWT_PLATFORM_REFRESH_COOKIE_DOMAIN", default="") or None
+)

@@ -21,6 +21,20 @@ class TenantSummarySerializer(serializers.Serializer):
     status = serializers.CharField(read_only=True)
 
 
+class OwnerTenantSummarySerializer(TenantSummarySerializer):
+    canonical_hostname = serializers.SerializerMethodField()
+
+    def get_canonical_hostname(self, tenant: Tenant) -> str | None:
+        return (
+            tenant.hostnames.filter(
+                is_canonical=True,
+                is_active=True,
+            )
+            .values_list("hostname", flat=True)
+            .first()
+        )
+
+
 class CurrentUserSerializer(serializers.ModelSerializer):
     tenant = serializers.SerializerMethodField()
 
@@ -33,7 +47,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
         if ownership is None:
             return None
 
-        return TenantSummarySerializer(ownership.tenant).data
+        return OwnerTenantSummarySerializer(ownership.tenant).data
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -129,7 +143,7 @@ class SignupSerializer(serializers.ModelSerializer):
 
     def get_tenant(self, user):
         ownership = user.tenant_ownerships.select_related("tenant").get()
-        return TenantSummarySerializer(ownership.tenant).data
+        return OwnerTenantSummarySerializer(ownership.tenant).data
 
     def validate_slug(self, value: str) -> str:
         slug = value.lower()

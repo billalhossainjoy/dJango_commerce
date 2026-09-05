@@ -44,6 +44,14 @@ class TenantOwner(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                name="one_tenant_per_owner",
+            ),
+        ]
+
     def __str__(self):
         return f"{self.user.email} owns {self.tenant.slug}"
 

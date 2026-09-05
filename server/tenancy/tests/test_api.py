@@ -43,6 +43,38 @@ def test_tenant_context_returns_not_found_for_unknown_slug(client):
 
 
 @pytest.mark.django_db
+def test_owner_login_context_returns_minimal_inactive_tenant_identity(client):
+    tenant = Tenant.objects.create(
+        slug="demo",
+        name="Demo Store",
+        status=Tenant.Status.PROVISIONING,
+    )
+
+    response = client.get(
+        reverse(
+            "tenant-owner-login-context",
+            kwargs={"tenant_slug": tenant.slug},
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"slug": "demo", "name": "Demo Store"}
+
+
+@pytest.mark.django_db
+def test_owner_login_context_returns_not_found_for_unknown_slug(client):
+    response = client.get(
+        reverse(
+            "tenant-owner-login-context",
+            kwargs={"tenant_slug": "unknown"},
+        ),
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Tenant not found."}
+
+
+@pytest.mark.django_db
 @override_settings(
     CORS_ALLOWED_ORIGINS=[],
     CORS_ALLOWED_ORIGIN_REGEXES=[

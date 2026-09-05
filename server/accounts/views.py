@@ -1,8 +1,8 @@
 from typing import Any, cast
 
 from django.conf import settings
-from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -46,7 +46,7 @@ class CurrentUserView(APIView):
         return Response(serializer.data)
 
 
-def set_refresh_cookie(response, *, name, token, path):
+def set_refresh_cookie(response, *, name, token, path, domain=None):
     response.set_cookie(
         key=name,
         value=token,
@@ -55,16 +55,18 @@ def set_refresh_cookie(response, *, name, token, path):
         secure=settings.JWT_REFRESH_COOKIE_SECURE,
         samesite="Lax",
         path=path,
+        domain=domain,
     )
 
 
-def move_refresh_to_cookie(response, *, name, path):
+def move_refresh_to_cookie(response, *, name, path, domain=None):
     refresh_token = response.data.pop("refresh")
     set_refresh_cookie(
         response,
         name=name,
         token=refresh_token,
         path=path,
+        domain=domain,
     )
     return response
 
@@ -76,6 +78,7 @@ class LoginView(TokenObtainPairView):
             response,
             name=settings.JWT_PLATFORM_REFRESH_COOKIE_NAME,
             path=PLATFORM_COOKIE_PATH,
+            domain=settings.JWT_PLATFORM_REFRESH_COOKIE_DOMAIN,
         )
 
 
@@ -115,6 +118,7 @@ class RefreshView(TokenRefreshView):
                 name=settings.JWT_PLATFORM_REFRESH_COOKIE_NAME,
                 token=rotated_refresh,
                 path=PLATFORM_COOKIE_PATH,
+                domain=settings.JWT_PLATFORM_REFRESH_COOKIE_DOMAIN,
             )
         return response
 
@@ -123,6 +127,9 @@ class RefreshCookieLogoutView(APIView):
     permission_classes = [AllowAny]
     refresh_cookie_name: str
     refresh_cookie_path: str
+
+    def get_refresh_cookie_domain(self) -> str | None:
+        return None
 
     def post(self, request: Request, *args, **kwargs) -> Response:
         refresh_token = request.COOKIES.get(self.refresh_cookie_name)
@@ -138,6 +145,7 @@ class RefreshCookieLogoutView(APIView):
             self.refresh_cookie_name,
             path=self.refresh_cookie_path,
             samesite="Lax",
+            domain=self.get_refresh_cookie_domain(),
         )
         return response
 
@@ -146,13 +154,24 @@ class LogoutView(RefreshCookieLogoutView):
     refresh_cookie_name = settings.JWT_PLATFORM_REFRESH_COOKIE_NAME
     refresh_cookie_path = PLATFORM_COOKIE_PATH
 
+    def get_refresh_cookie_domain(self) -> str | None:
+        return settings.JWT_PLATFORM_REFRESH_COOKIE_DOMAIN
+
 
 def active_tenant(tenant_slug: str) -> Tenant:
-    return get_object_or_404(
-        Tenant,
-        slug=tenant_slug,
-        status=Tenant.Status.ACTIVE,
-    )
+    tenant = Tenant.objects.filter(slug=tenant_slug).first()
+    if tenant is None:
+        raise NotFound("Store not found. Check the store address and try again.")
+    if tenant.status == Tenant.Status.PROVISIONING:
+        raise NotFound(
+            "This store is not open yet. The store owner must activate it "
+            "from their dashboard before customers can sign up or log in."
+        )
+    if tenant.status != Tenant.Status.ACTIVE:
+        raise NotFound(
+            "This store is currently unavailable. Please contact the store owner."
+        )
+    return tenant
 
 
 class CustomerSignupView(APIView):
