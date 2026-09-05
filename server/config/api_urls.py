@@ -10,6 +10,10 @@ urlpatterns = [
         "tenants/<slug:tenant_slug>/auth/",
         include("accounts.customer_urls"),
     ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/",
+        include("customers.urls"),
+    ),
     path("", include("tenancy.urls")),
     path("", include("catalog.urls")),
 ]

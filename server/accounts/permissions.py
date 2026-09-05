@@ -1,5 +1,3 @@
-from typing import cast
-
 from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 
@@ -10,7 +8,7 @@ class IsPlatformUser(BasePermission):
     def has_permission(self, request: Request, view) -> bool:
         if not request.user.is_authenticated:
             return False
-        user = cast(User, request.user)
+        user = request.user
         return user.account_type == User.AccountType.PLATFORM
 
 
@@ -18,7 +16,7 @@ class IsCustomerForTenant(BasePermission):
     def has_permission(self, request: Request, view) -> bool:
         if not request.user.is_authenticated:
             return False
-        user = cast(User, request.user)
+        user = request.user
         return bool(
             user.account_type == User.AccountType.CUSTOMER
             and user.tenant is not None

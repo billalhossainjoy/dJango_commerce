@@ -96,6 +96,13 @@ def invalid_credentials() -> AuthenticationFailed:
     return AuthenticationFailed("Invalid email or password.", "no_active_account")
 
 
+def blocked_customer() -> AuthenticationFailed:
+    return AuthenticationFailed(
+        "Your customer account has been blocked. Contact the store owner.",
+        "account_blocked",
+    )
+
+
 class TenantTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         tenant = self.context["tenant"]
@@ -115,10 +122,25 @@ class TenantTokenObtainPairSerializer(TokenObtainPairSerializer):
                 tenant_ownerships__tenant=tenant,
             ).first()
 
-        customer_matches = _password_matches(customer, password) and (
-            tenant is not None and tenant.status == Tenant.Status.ACTIVE
+        customer_password_matches = _password_matches(customer, password)
+        owner_password_matches = _password_matches(owner, password)
+        customer_matches = (
+            customer is not None
+            and customer.is_active
+            and customer_password_matches
+            and tenant is not None
+            and tenant.status == Tenant.Status.ACTIVE
         )
-        owner_matches = _password_matches(owner, password)
+        owner_matches = owner is not None and owner.is_active and owner_password_matches
+
+        if (
+            customer is not None
+            and not customer.is_active
+            and customer_password_matches
+            and not owner_matches
+        ):
+            raise blocked_customer()
+
         matches = [
             user
             for user, matches_password in (
@@ -150,8 +172,7 @@ def _password_matches(user: User | None, password: str) -> bool:
         User().set_password(password)
         return False
 
-    password_matches = user.check_password(password)
-    return user.is_active and password_matches
+    return user.check_password(password)
 
 
 class PlatformTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -161,7 +182,11 @@ class PlatformTokenObtainPairSerializer(TokenObtainPairSerializer):
             email__iexact=email,
             account_type=User.AccountType.PLATFORM,
         ).first()
-        if not _password_matches(user, attrs["password"]):
+        if (
+            user is None
+            or not user.is_active
+            or not _password_matches(user, attrs["password"])
+        ):
             raise invalid_credentials()
 
         assert user is not None

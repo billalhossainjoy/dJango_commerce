@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "tenancy",
     "accounts",
     "catalog",
+    "customers",
 ]
 
 MIDDLEWARE = [

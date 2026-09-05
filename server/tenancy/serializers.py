@@ -6,7 +6,7 @@ from tenancy.models import Tenant
 class TenantSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Tenant
-        fields = ("id", "slug", "name", "status")
+        fields: tuple[str, ...] = ("id", "slug", "name", "status")
 
 
 class OwnerTenantSummarySerializer(TenantSummarySerializer):
