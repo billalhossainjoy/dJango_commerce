@@ -11,6 +11,7 @@ from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.generics import (
     ListAPIView,
     ListCreateAPIView,
+    RetrieveAPIView,
     RetrieveUpdateDestroyAPIView,
 )
 from rest_framework.permissions import IsAuthenticated
@@ -62,6 +63,14 @@ def products_with_ready_images():
     )
 
 
+def public_products(tenant_slug: str):
+    return products_with_ready_images().filter(
+        tenant__slug=tenant_slug,
+        tenant__status=Tenant.Status.ACTIVE,
+        is_active=True,
+    )
+
+
 class ProductImageStorageUnavailable(APIException):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     default_detail = "Product image storage is not configured."
@@ -85,11 +94,16 @@ class PublicProductListView(ListAPIView):
     serializer_class = ProductSerializer
 
     def get_queryset(self):
-        return products_with_ready_images().filter(
-            tenant__slug=self.kwargs["tenant_slug"],
-            tenant__status=Tenant.Status.ACTIVE,
-            is_active=True,
-        )
+        return public_products(self.kwargs["tenant_slug"])
+
+
+class PublicProductDetailView(RetrieveAPIView):
+    serializer_class = ProductSerializer
+    lookup_field = "slug"
+    lookup_url_kwarg = "product_slug"
+
+    def get_queryset(self):
+        return public_products(self.kwargs["tenant_slug"])
 
 
 class AdminProductListCreateView(OwnedTenantMixin, ListCreateAPIView):

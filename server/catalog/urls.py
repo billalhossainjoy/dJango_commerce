@@ -7,6 +7,7 @@ from catalog.views import (
     AdminProductImageUploadCompleteView,
     AdminProductImageUploadIntentView,
     AdminProductListCreateView,
+    PublicProductDetailView,
     PublicProductListView,
 )
 
@@ -15,6 +16,11 @@ urlpatterns = [
         "tenants/<slug:tenant_slug>/products/",
         PublicProductListView.as_view(),
         name="public-product-list",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/products/<slug:product_slug>/",
+        PublicProductDetailView.as_view(),
+        name="public-product-detail",
     ),
     path(
         "tenants/<slug:tenant_slug>/admin/products/",

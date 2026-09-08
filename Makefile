@@ -18,7 +18,7 @@ dev:
 	$(MAKE) client
 
 client:
-	pnpm --dir client dev --hostname 0.0.0.0
+	env -u DEBUG pnpm --dir client dev --hostname 0.0.0.0
 
 server:
 	uv run --project server python server/manage.py runserver 0.0.0.0:8000

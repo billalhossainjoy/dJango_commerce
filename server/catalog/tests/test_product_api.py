@@ -109,6 +109,52 @@ def test_public_products_include_only_active_products_from_active_tenant(client)
 
 
 @pytest.mark.django_db
+def test_public_product_detail_uses_tenant_and_active_product_slugs(client):
+    tenant = Tenant.objects.create(
+        slug="demo",
+        name="Demo Store",
+        status=Tenant.Status.ACTIVE,
+    )
+    visible_product = Product.objects.create(
+        tenant=tenant,
+        name="Visible Product",
+        slug="visible-product",
+        price_cents=2500,
+        is_active=True,
+    )
+    hidden_product = Product.objects.create(
+        tenant=tenant,
+        name="Hidden Product",
+        slug="hidden-product",
+        price_cents=1500,
+        is_active=False,
+    )
+
+    visible_response = client.get(
+        reverse(
+            "public-product-detail",
+            kwargs={
+                "tenant_slug": tenant.slug,
+                "product_slug": visible_product.slug,
+            },
+        )
+    )
+    hidden_response = client.get(
+        reverse(
+            "public-product-detail",
+            kwargs={
+                "tenant_slug": tenant.slug,
+                "product_slug": hidden_product.slug,
+            },
+        )
+    )
+
+    assert visible_response.status_code == 200
+    assert visible_response.json()["id"] == str(visible_product.id)
+    assert hidden_response.status_code == 404
+
+
+@pytest.mark.django_db
 @override_settings(CLOUDINARY_CLOUD_NAME="demo-cloud")
 def test_public_products_include_only_ready_images(client):
     tenant = Tenant.objects.create(

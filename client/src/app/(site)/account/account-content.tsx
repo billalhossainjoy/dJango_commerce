@@ -1,11 +1,12 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { useCustomerAuth } from "@/hooks/use-customer-auth";
+import Link from "next/link";
+
+import { useAccountTenantSlug } from "@/app/(site)/account/account-shell";
 import { useCurrentCustomer } from "@/hooks/use-current-customer";
 
-export function AccountContent({ tenantSlug }: { tenantSlug: string }) {
-  const auth = useCustomerAuth(tenantSlug);
+export function AccountContent() {
+  const tenantSlug = useAccountTenantSlug();
   const customer = useCurrentCustomer(tenantSlug);
 
   if (customer.isPending) {
@@ -16,21 +17,65 @@ export function AccountContent({ tenantSlug }: { tenantSlug: string }) {
   }
 
   return (
-    <div className="grid gap-6 items-start lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-      <section className="rounded-2xl border border-border bg-card text-card-foreground shadow-sm p-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Profile</p>
-        <h2 className="mt-3 break-words text-lg font-semibold text-foreground">{customer.data.email}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Customer account</p>
-        <Button className="mt-6 h-10 bg-card px-4 text-sm text-card-foreground dark:bg-card" variant="outline" onClick={() => void auth.logout()}>
-          Log out
-        </Button>
-      </section>
-      <section className="rounded-2xl border border-border bg-card text-card-foreground shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-foreground">Orders</h2>
-        <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/50 px-6 py-10 text-center">
-          <p className="text-sm font-medium text-foreground">No orders to show yet</p>
-          <p className="mt-1 text-sm text-muted-foreground">Your order history will appear here.</p>
-        </div>
+    <div>
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-700">
+          Overview
+        </p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
+          Welcome back
+        </h2>
+        <p className="mt-2 text-zinc-600">
+          Review your orders and manage your customer account.
+        </p>
+      </div>
+
+      <div className="mt-8 grid gap-5 sm:grid-cols-2">
+        <Link
+          href="/account/orders"
+          className="group rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <p className="text-sm font-medium text-zinc-500">Order history</p>
+          <h3 className="mt-2 text-xl font-semibold text-zinc-950">
+            View your orders
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            Track past purchases and view order details when available.
+          </p>
+          <span className="mt-6 inline-block text-sm font-semibold text-indigo-700 group-hover:text-indigo-800">
+            Go to orders →
+          </span>
+        </Link>
+
+        <Link
+          href="/account/settings"
+          className="group rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <p className="text-sm font-medium text-zinc-500">Account details</p>
+          <h3 className="mt-2 break-words text-xl font-semibold text-zinc-950">
+            {customer.data.email}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            Review your identity, store membership, and session settings.
+          </p>
+          <span className="mt-6 inline-block text-sm font-semibold text-indigo-700 group-hover:text-indigo-800">
+            Manage settings →
+          </span>
+        </Link>
+      </div>
+
+      <section className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-950 p-6 text-white shadow-sm">
+        <p className="text-sm text-zinc-400">Continue shopping</p>
+        <h3 className="mt-2 text-xl font-semibold">Discover the latest products</h3>
+        <p className="mt-2 text-sm text-zinc-300">
+          Return to the storefront and browse the current collection.
+        </p>
+        <Link
+          href="/#products"
+          className="mt-6 inline-block rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-100"
+        >
+          Browse products
+        </Link>
       </section>
     </div>
   );
