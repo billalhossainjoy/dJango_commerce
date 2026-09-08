@@ -17,7 +17,8 @@ order features have not been implemented yet.
 - Browser API traffic will use a same-origin `/api` route through Next.js. The
   Django service will not trust a tenant ID supplied directly by a browser.
 - Production services will run on Railway with Neon PostgreSQL, Cloudflare DNS
-  and custom hostnames, Cloudflare R2, Stripe, and a background worker.
+  and custom hostnames, Cloudinary for product images, Stripe, and a background
+  worker.
 
 ## Repository layout
 
@@ -96,6 +97,11 @@ pnpm --dir client build
 - `.env.production.example` is the production configuration contract.
 - `.env.production` is ignored and must contain the real Django and Neon
   credentials when you configure production.
+
+Product images use a signed Cloudinary upload preset. Configure that preset to
+allow only `jpg`, `png`, and `webp` images and set its maximum file size to
+5,242,880 bytes (5 MiB). Keep the Cloudinary API secret on the Django service;
+never expose it through a `NEXT_PUBLIC_` variable.
 
 To test production configuration locally after creating `.env.production`:
 

@@ -2,6 +2,10 @@ from django.urls import path
 
 from catalog.views import (
     AdminProductDetailView,
+    AdminProductImageDetailView,
+    AdminProductImagePrimaryView,
+    AdminProductImageUploadCompleteView,
+    AdminProductImageUploadIntentView,
     AdminProductListCreateView,
     PublicProductListView,
 )
@@ -21,5 +25,29 @@ urlpatterns = [
         "tenants/<slug:tenant_slug>/admin/products/<uuid:pk>/",
         AdminProductDetailView.as_view(),
         name="admin-product-detail",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/products/"
+        "<uuid:product_id>/images/upload-intent/",
+        AdminProductImageUploadIntentView.as_view(),
+        name="admin-product-image-upload-intent",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/products/<uuid:product_id>/images/"
+        "<uuid:image_id>/complete/",
+        AdminProductImageUploadCompleteView.as_view(),
+        name="admin-product-image-upload-complete",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/products/<uuid:product_id>/images/"
+        "<uuid:image_id>/",
+        AdminProductImageDetailView.as_view(),
+        name="admin-product-image-detail",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/products/<uuid:product_id>/images/"
+        "<uuid:image_id>/primary/",
+        AdminProductImagePrimaryView.as_view(),
+        name="admin-product-image-primary",
     ),
 ]

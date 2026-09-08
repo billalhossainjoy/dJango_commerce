@@ -5,10 +5,15 @@ import { use } from "react";
 
 import { ProductForm } from "@/app/admin/products/product-form";
 import {
+  useDeleteProductImage,
+  useMakeProductImagePrimary,
   useProduct,
+  useUploadProductImages,
   useUpdateProduct,
+  useUpdateProductImageAltText,
 } from "@/app/admin/products/use-products";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { getApiErrorMessage } from "@/lib/api-client";
 
 export default function UpdateProductPage({
   params,
@@ -20,6 +25,10 @@ export default function UpdateProductPage({
   const currentUser = useCurrentUser();
   const product = useProduct(id);
   const updateProduct = useUpdateProduct(id);
+  const uploadImages = useUploadProductImages(id);
+  const deleteImage = useDeleteProductImage(id);
+  const makeImagePrimary = useMakeProductImagePrimary(id);
+  const updateImageAltText = useUpdateProductImageAltText(id);
 
   if (currentUser.isPending || product.isPending) {
     return <p className="text-sm text-zinc-600">Loading product…</p>;
@@ -44,11 +53,33 @@ export default function UpdateProductPage({
       </p>
       <ProductForm
         product={product.data}
+        isDeletingImage={deleteImage.isPending}
+        isMakingImagePrimary={makeImagePrimary.isPending}
+        isUpdatingImageAltText={updateImageAltText.isPending}
         submitLabel="Save changes"
         pendingLabel="Saving…"
-        isPending={updateProduct.isPending}
-        onSubmit={async (input) => {
+        isPending={updateProduct.isPending || uploadImages.isPending}
+        onDeleteImage={(imageId) => deleteImage.mutateAsync(imageId)}
+        onMakeImagePrimary={(imageId) =>
+          makeImagePrimary.mutateAsync(imageId)
+        }
+        onUpdateImageAltText={(imageId, altText) =>
+          updateImageAltText.mutateAsync({ imageId, altText })
+        }
+        onSubmit={async (input, images) => {
           await updateProduct.mutateAsync(input);
+          if (images.length > 0) {
+            try {
+              await uploadImages.mutateAsync(images);
+            } catch (error) {
+              throw new Error(
+                getApiErrorMessage(
+                  error,
+                  "Product changes were saved, but one or more images failed to upload. Reselect those images and try again.",
+                ),
+              );
+            }
+          }
           router.replace("/admin/products");
         }}
       />

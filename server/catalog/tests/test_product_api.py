@@ -1,9 +1,10 @@
 import pytest
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
-from catalog.models import Product
+from catalog.models import Product, ProductImage
 from tenancy.models import Tenant, TenantOwner
 
 
@@ -105,3 +106,54 @@ def test_public_products_include_only_active_products_from_active_tenant(client)
 
     assert response.status_code == 200
     assert [product["name"] for product in response.json()] == ["Visible Product"]
+
+
+@pytest.mark.django_db
+@override_settings(CLOUDINARY_CLOUD_NAME="demo-cloud")
+def test_public_products_include_only_ready_images(client):
+    tenant = Tenant.objects.create(
+        slug="demo",
+        name="Demo Store",
+        status=Tenant.Status.ACTIVE,
+    )
+    product = Product.objects.create(
+        tenant=tenant,
+        name="Canvas Backpack",
+        slug="canvas-backpack",
+        price_cents=5900,
+    )
+    ready_image = ProductImage.objects.create(
+        tenant=tenant,
+        product=product,
+        public_id=f"{tenant.id}/products/{product.id}/ready",
+        version=123,
+        format="webp",
+        content_type="image/webp",
+        size_bytes=2048,
+        status=ProductImage.Status.READY,
+    )
+    ProductImage.objects.create(
+        tenant=tenant,
+        product=product,
+        public_id=f"{tenant.id}/products/{product.id}/pending",
+        format="png",
+        content_type="image/png",
+        size_bytes=1024,
+    )
+
+    response = client.get(
+        reverse("public-product-list", kwargs={"tenant_slug": tenant.slug})
+    )
+
+    assert response.status_code == 200
+    assert response.json()[0]["images"] == [
+        {
+            "id": str(ready_image.id),
+            "url": (
+                "https://res.cloudinary.com/demo-cloud/image/upload/"
+                f"v123/{ready_image.public_id}.webp"
+            ),
+            "alt_text": "",
+            "sort_order": 0,
+        }
+    ]

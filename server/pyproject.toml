@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Django API for the e-commerce application"
 requires-python = ">=3.14,<3.15"
 dependencies = [
+    "cloudinary>=1.44,<2",
     "Django==6.1",
     "django-cors-headers>=4.9,<5",
     "django-environ==0.12.0",
@@ -32,7 +33,7 @@ dev = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py", "*_test.py"]
-testpaths = ["tests", "accounts", "tenancy"]
+testpaths = ["tests", "accounts", "catalog", "customers", "tenancy"]
 addopts = [
     "-ra",
     "--strict-config",
@@ -66,5 +67,5 @@ strict_settings = true
 strict_model_abstract_attrs = true
 
 [[tool.mypy.overrides]]
-module = ["environ"]
+module = ["cloudinary.*", "environ"]
 ignore_missing_imports = true

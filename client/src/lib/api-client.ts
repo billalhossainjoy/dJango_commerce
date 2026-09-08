@@ -8,18 +8,20 @@ export class ApiError extends Error {
 }
 
 export function getApiErrorMessage(error: unknown, fallback: string): string {
-  if (!(error instanceof ApiError) || !error.details) {
-    return fallback;
+  if (error instanceof ApiError && error.details) {
+    if (typeof error.details === "object" && "detail" in error.details) {
+      const detail = error.details.detail;
+      if (typeof detail === "string") return detail;
+    }
+
+    if (typeof error.details === "object") {
+      const firstError = Object.values(error.details).flat()[0];
+      if (typeof firstError === "string") return firstError;
+    }
   }
 
-  if (typeof error.details === "object" && "detail" in error.details) {
-    const detail = error.details.detail;
-    if (typeof detail === "string") return detail;
-  }
-
-  if (typeof error.details === "object") {
-    const firstError = Object.values(error.details).flat()[0];
-    if (typeof firstError === "string") return firstError;
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
 
   return fallback;

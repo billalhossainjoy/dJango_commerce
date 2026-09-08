@@ -3,7 +3,10 @@
 import { useRouter } from "next/navigation";
 
 import { ProductForm } from "@/app/admin/products/product-form";
-import { useCreateProduct } from "@/app/admin/products/use-products";
+import {
+  ProductImageUploadError,
+  useCreateProduct,
+} from "@/app/admin/products/use-products";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 export default function CreateProductPage() {
@@ -32,9 +35,16 @@ export default function CreateProductPage() {
         submitLabel="Create product"
         pendingLabel="Creating…"
         isPending={createProduct.isPending}
-        onSubmit={async (input) => {
-          await createProduct.mutateAsync(input);
-          router.replace("/admin/products");
+        onSubmit={async (input, images) => {
+          try {
+            await createProduct.mutateAsync({ input, images });
+            router.replace("/admin/products");
+          } catch (error) {
+            if (error instanceof ProductImageUploadError) {
+              router.replace(`/admin/products/${error.productId}/update`);
+            }
+            throw error;
+          }
         }}
       />
     </div>

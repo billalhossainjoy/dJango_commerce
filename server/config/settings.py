@@ -12,6 +12,12 @@ ENVIRONMENT = os.environ.get("DJANGO_ENVIRONMENT", "development")
 ENV_FILE = Path(
     os.environ.get("DJANGO_ENV_FILE", REPOSITORY_ROOT / f".env.{ENVIRONMENT}")
 )
+LOCAL_ENV_FILE = Path(
+    os.environ.get(
+        "DJANGO_LOCAL_ENV_FILE",
+        REPOSITORY_ROOT / f".env.{ENVIRONMENT}.local",
+    )
+)
 
 env = environ.Env(
     DEBUG=(bool, False),
@@ -21,7 +27,10 @@ env = environ.Env(
     DATABASE_CONN_MAX_AGE=(int, 0),
 )
 
-# Environment variables supplied by the runtime win over values in the file.
+# Runtime variables win over local secrets, and local secrets win over the
+# tracked environment defaults.
+if LOCAL_ENV_FILE.is_file():
+    environ.Env.read_env(LOCAL_ENV_FILE, overwrite=False)
 if ENV_FILE.is_file():
     environ.Env.read_env(ENV_FILE, overwrite=False)
 
@@ -136,6 +145,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "static/"
+
+
+# Product media
+
+CLOUDINARY_CLOUD_NAME = env.str("CLOUDINARY_CLOUD_NAME", default="")
+CLOUDINARY_API_KEY = env.str("CLOUDINARY_API_KEY", default="")
+CLOUDINARY_API_SECRET = env.str("CLOUDINARY_API_SECRET", default="")
+CLOUDINARY_UPLOAD_PRESET = env.str("CLOUDINARY_UPLOAD_PRESET", default="")
 
 
 # Email
