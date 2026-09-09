@@ -16,4 +16,5 @@ urlpatterns = [
     ),
     path("", include("tenancy.urls")),
     path("", include("catalog.urls")),
+    path("", include("orders.urls")),
 ]

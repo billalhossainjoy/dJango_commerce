@@ -32,6 +32,9 @@ export function StorefrontFooter({ tenantSlug }: { tenantSlug: string }) {
             <Link href="/#products" className="transition hover:text-white">
               All products
             </Link>
+            <Link href="/cart" className="transition hover:text-white">
+              Shopping cart
+            </Link>
           </nav>
         </div>
 

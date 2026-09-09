@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { AuthTokens } from "@/app/app.service";
+import { claimGuestCart } from "@/app/(site)/cart/use-cart";
 import { CustomerAuthService } from "@/services/customer-auth.service";
 import { authSessionQueryKey, useAuthStore } from "@/stores/auth-store";
 import {
@@ -33,6 +34,7 @@ export function useTenantLogin(tenantSlug: string) {
 
       queryClient.setQueryData(customerSessionQueryKey(tenantSlug), { access });
       setCustomerAuthenticated(tenantSlug, access);
+      claimGuestCart(queryClient, tenantSlug, access);
     },
   });
 }

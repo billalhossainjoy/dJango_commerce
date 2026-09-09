@@ -5,10 +5,17 @@ import Link from "next/link";
 import { useState } from "react";
 
 import {
+  useAddCartItem,
+  useCart,
+  useRemoveCartItem,
+  useUpdateCartItem,
+} from "@/app/(site)/cart/use-cart";
+import {
   useStorefrontProduct,
   useStorefrontProducts,
 } from "@/app/(site)/products/use-products";
 import { StorefrontProductCard } from "@/components/storefront-product-card";
+import { getApiErrorMessage } from "@/lib/api-client";
 import { formatUsd } from "@/lib/format";
 
 type ProductDetailsProps = {
@@ -22,7 +29,15 @@ export function ProductDetails({
 }: ProductDetailsProps) {
   const product = useStorefrontProduct(tenantSlug, productSlug);
   const products = useStorefrontProducts(tenantSlug);
+  const cart = useCart(tenantSlug);
+  const addCartItem = useAddCartItem(tenantSlug);
+  const updateCartItem = useUpdateCartItem(tenantSlug);
+  const removeCartItem = useRemoveCartItem(tenantSlug);
   const [selectedImageId, setSelectedImageId] = useState<string>();
+  const [cartMessage, setCartMessage] = useState<{
+    kind: "success" | "error";
+    text: string;
+  }>();
 
   if (product.isPending) {
     return <div className="mx-auto max-w-6xl px-6 py-16">Loading product…</div>;
@@ -51,6 +66,34 @@ export function ProductDetails({
     product.data.images.find((image) => image.id === selectedImageId) ??
     product.data.images[0];
   const inStock = product.data.stock_quantity > 0;
+  const cartItem = cart.data?.items.find(
+    (item) => item.product.id === product.data.id,
+  );
+  const isChangingCart =
+    addCartItem.isPending ||
+    updateCartItem.isPending ||
+    removeCartItem.isPending;
+
+  async function changeCartQuantity(nextQuantity: number) {
+    if (!cartItem) return;
+
+    setCartMessage(undefined);
+    try {
+      if (nextQuantity === 0) {
+        await removeCartItem.mutateAsync(cartItem.id);
+      } else {
+        await updateCartItem.mutateAsync({
+          itemId: cartItem.id,
+          quantity: nextQuantity,
+        });
+      }
+    } catch (error) {
+      setCartMessage({
+        kind: "error",
+        text: getApiErrorMessage(error, "Unable to update your cart."),
+      });
+    }
+  }
   const suggestedProducts = (products.data ?? [])
     .filter((suggestion) => suggestion.id !== product.data.id)
     .slice(0, 3);
@@ -142,6 +185,109 @@ export function ProductDetails({
               </span>
             </div>
           </div>
+
+          <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+            {cartItem ? (
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-zinc-700">
+                    In your cart
+                  </p>
+                  <div className="mt-2 flex h-12 items-center overflow-hidden rounded-xl border border-zinc-300 bg-white">
+                    <button
+                      type="button"
+                      aria-label="Decrease cart quantity"
+                      disabled={isChangingCart}
+                      className="h-full px-4 text-lg text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() =>
+                        void changeCartQuantity(cartItem.quantity - 1)
+                      }
+                    >
+                      −
+                    </button>
+                    <span
+                      aria-label={`${cartItem.quantity} in cart`}
+                      className="grid h-full min-w-14 place-items-center border-x border-zinc-300 px-3 text-sm font-semibold"
+                    >
+                      {cartItem.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Increase cart quantity"
+                      disabled={
+                        isChangingCart ||
+                        cartItem.quantity >= product.data.stock_quantity ||
+                        cartItem.quantity >= 99
+                      }
+                      className="h-full px-4 text-lg text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() =>
+                        void changeCartQuantity(cartItem.quantity + 1)
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <Link
+                  href="/cart"
+                  className="rounded-xl bg-zinc-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  View cart
+                </Link>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={
+                  !inStock || cart.isPending || cart.isError || isChangingCart
+                }
+                className="h-12 w-full rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                onClick={() => {
+                  setCartMessage(undefined);
+                  void addCartItem
+                    .mutateAsync({ productId: product.data.id, quantity: 1 })
+                    .then(() =>
+                      setCartMessage({
+                        kind: "success",
+                        text: "Product added to your cart.",
+                      }),
+                    )
+                    .catch((error) =>
+                      setCartMessage({
+                        kind: "error",
+                        text: getApiErrorMessage(
+                          error,
+                          "Unable to add this product to your cart.",
+                        ),
+                      }),
+                    );
+                }}
+              >
+                {addCartItem.isPending
+                  ? "Adding…"
+                  : inStock
+                    ? "Add to cart"
+                    : "Out of stock"}
+              </button>
+            )}
+            {cartMessage ? (
+              <p
+                role="status"
+                className={`mt-4 text-sm font-medium ${
+                  cartMessage.kind === "success"
+                    ? "text-emerald-700"
+                    : "text-red-600"
+                }`}
+              >
+                {cartMessage.text}
+              </p>
+            ) : cart.isError ? (
+              <p className="mt-4 text-sm font-medium text-red-600">
+                Your cart is temporarily unavailable.
+              </p>
+            ) : null}
+          </div>
+
           {product.data.description ? (
             <div className="mt-8 border-t border-zinc-200 pt-8">
               <h2 className="font-semibold text-zinc-950">Description</h2>

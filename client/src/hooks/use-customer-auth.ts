@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { claimGuestCart } from "@/app/(site)/cart/use-cart";
 import { CustomerAuthService } from "@/services/customer-auth.service";
 import {
   customerSessionQueryKey,
@@ -21,6 +22,7 @@ export function useCustomerAuth(tenantSlug: string) {
     onSuccess: ({ access }) => {
       queryClient.setQueryData(customerSessionQueryKey(tenantSlug), { access });
       store.setAuthenticated(tenantSlug, access);
+      claimGuestCart(queryClient, tenantSlug, access);
     },
   });
   const signup = useMutation({

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { DropdownMenu } from "radix-ui";
 
+import { useCart } from "@/app/(site)/cart/use-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { useCurrentCustomer } from "@/hooks/use-current-customer";
@@ -14,18 +15,47 @@ export function Header({ tenantSlug }: { tenantSlug: string | null }) {
   const customer = useCurrentCustomer(tenantSlug ?? "");
   const tenant = useTenantQuery(tenantSlug);
   const isTenant = tenantSlug !== null;
+  const cart = useCart(tenantSlug ?? "");
   const status = isTenant ? customerAuth.status : platformAuth.status;
   const email = customer.data?.email;
   const logout = isTenant ? customerAuth.logout : platformAuth.logout;
 
   return (
     <header className="border-b border-zinc-200 bg-white text-zinc-950">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link className="text-lg font-semibold tracking-tight" href="/">
           {isTenant ? tenant.data?.name ?? tenantSlug : "E-commerce"}
         </Link>
 
         <nav className="flex items-center gap-4" aria-label="Account navigation">
+          {isTenant ? (
+            <Link
+              href="/cart"
+              aria-label={`Shopping cart with ${cart.data?.item_count ?? 0} items`}
+              className="relative flex items-center gap-2 text-sm font-medium text-zinc-700 transition hover:text-zinc-950"
+            >
+              <svg
+                aria-hidden="true"
+                className="size-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="9" cy="20" r="1" />
+                <circle cx="19" cy="20" r="1" />
+                <path d="M3 4h2l2.4 10.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 8H6" />
+              </svg>
+              <span className="hidden sm:inline">Cart</span>
+              {(cart.data?.item_count ?? 0) > 0 ? (
+                <span className="absolute -right-2.5 -top-2.5 grid min-w-5 place-items-center rounded-full bg-indigo-600 px-1 text-[11px] font-semibold leading-5 text-white sm:static sm:min-w-0 sm:bg-transparent sm:p-0 sm:text-sm sm:leading-normal sm:text-zinc-700">
+                  {cart.data?.item_count}
+                </span>
+              ) : null}
+            </Link>
+          ) : null}
           {status === "authenticated" ? (
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
