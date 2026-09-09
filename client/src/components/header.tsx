@@ -17,7 +17,9 @@ export function Header({ tenantSlug }: { tenantSlug: string | null }) {
   const isTenant = tenantSlug !== null;
   const cart = useCart(tenantSlug ?? "");
   const status = isTenant ? customerAuth.status : platformAuth.status;
+  const customerName = customer.data?.name.trim();
   const email = customer.data?.email;
+  const customerLabel = customerName || email;
   const logout = isTenant ? customerAuth.logout : platformAuth.logout;
 
   return (
@@ -64,8 +66,8 @@ export function Header({ tenantSlug }: { tenantSlug: string | null }) {
                   type="button"
                   aria-label="Open account menu"
                 >
-                  {isTenant && email ? (
-                    email.charAt(0).toUpperCase()
+                  {isTenant && customerLabel ? (
+                    customerLabel.charAt(0).toUpperCase()
                   ) : (
                     <svg
                       aria-hidden="true"
@@ -91,8 +93,13 @@ export function Header({ tenantSlug }: { tenantSlug: string | null }) {
                   className="z-50 min-w-52 rounded-xl border border-zinc-200 bg-white p-1.5 text-zinc-950 shadow-lg"
                 >
                   <DropdownMenu.Label className="px-2 py-1.5 text-xs font-medium uppercase tracking-wider text-zinc-500">
-                    {email ?? "My account"}
+                    {customerLabel ?? "My account"}
                   </DropdownMenu.Label>
+                  {customerName && email ? (
+                    <div className="truncate px-2 pb-1.5 text-xs text-zinc-500">
+                      {email}
+                    </div>
+                  ) : null}
                   <DropdownMenu.Separator className="my-1 h-px bg-zinc-200" />
                   <DropdownMenu.Item asChild>
                     <Link

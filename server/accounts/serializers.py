@@ -36,7 +36,28 @@ class CustomerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "email", "account_type", "tenant")
+        fields = ("id", "name", "email", "account_type", "tenant")
+
+
+def validate_customer_email(
+    value: str,
+    *,
+    tenant: Tenant,
+    exclude_user: User | None = None,
+) -> str:
+    email: str = User.objects.normalize_email(value).casefold()
+    users = User.objects.filter(email__iexact=email).filter(
+        Q(account_type=User.AccountType.CUSTOMER, tenant=tenant)
+        | Q(
+            account_type=User.AccountType.PLATFORM,
+            tenant_ownerships__tenant=tenant,
+        )
+    )
+    if exclude_user is not None:
+        users = users.exclude(id=exclude_user.id)
+    if users.exists():
+        raise serializers.ValidationError("An account with this email exists.")
+    return email
 
 
 class CustomerSignupSerializer(serializers.ModelSerializer):
@@ -48,18 +69,7 @@ class CustomerSignupSerializer(serializers.ModelSerializer):
         read_only_fields = ("id",)
 
     def validate_email(self, value: str) -> str:
-        email: str = User.objects.normalize_email(value).casefold()
-        tenant = self.context["tenant"]
-        email_is_taken = User.objects.filter(email__iexact=email).filter(
-            Q(account_type=User.AccountType.CUSTOMER, tenant=tenant)
-            | Q(
-                account_type=User.AccountType.PLATFORM,
-                tenant_ownerships__tenant=tenant,
-            )
-        )
-        if email_is_taken.exists():
-            raise serializers.ValidationError("An account with this email exists.")
-        return email
+        return validate_customer_email(value, tenant=self.context["tenant"])
 
     def validate_password(self, value: str) -> str:
         validate_password(value)
@@ -71,6 +81,43 @@ class CustomerSignupSerializer(serializers.ModelSerializer):
             tenant=self.context["tenant"],
             account_type=User.AccountType.CUSTOMER,
         )
+
+
+class CustomerProfileSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(max_length=120)
+
+    class Meta:
+        model = User
+        fields = ("name", "email")
+
+    def validate_email(self, value: str) -> str:
+        user = self.instance
+        assert isinstance(user, User) and user.tenant is not None
+        return validate_customer_email(
+            value,
+            tenant=user.tenant,
+            exclude_user=user,
+        )
+
+
+class CustomerPasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+
+    def validate_current_password(self, value: str) -> str:
+        if not self.context["user"].check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate_new_password(self, value: str) -> str:
+        validate_password(value, self.context["user"])
+        return value
+
+    def save(self) -> User:
+        user = self.context["user"]
+        user.set_password(self.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        return user
 
 
 def refresh_token_for(user: User) -> RefreshToken:

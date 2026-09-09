@@ -15,6 +15,8 @@ from accounts.models import User
 from accounts.permissions import IsCustomerForTenant, IsPlatformUser
 from accounts.serializers import (
     CurrentUserSerializer,
+    CustomerPasswordSerializer,
+    CustomerProfileSerializer,
     CustomerSerializer,
     CustomerSignupSerializer,
     PlatformTokenObtainPairSerializer,
@@ -275,3 +277,28 @@ class CustomerCurrentUserView(APIView):
     def get(self, request: Request, tenant_slug: str) -> Response:
         active_tenant(tenant_slug)
         return Response(CustomerSerializer(request.user).data)
+
+    def patch(self, request: Request, tenant_slug: str) -> Response:
+        active_tenant(tenant_slug)
+        serializer = CustomerProfileSerializer(
+            request.user,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        customer = serializer.save()
+        return Response(CustomerSerializer(customer).data)
+
+
+class CustomerPasswordView(APIView):
+    permission_classes = [IsAuthenticated, IsCustomerForTenant]
+
+    def post(self, request: Request, tenant_slug: str) -> Response:
+        active_tenant(tenant_slug)
+        serializer = CustomerPasswordSerializer(
+            data=request.data,
+            context={"user": request.user},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)

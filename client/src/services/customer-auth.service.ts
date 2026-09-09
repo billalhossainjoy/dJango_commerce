@@ -8,6 +8,7 @@ export type TenantLoginResult = CustomerAuthTokens & {
 
 export type Customer = {
   id: string;
+  name: string;
   email: string;
   account_type: "customer";
   tenant: {
@@ -54,6 +55,30 @@ export class CustomerAuthService {
     return apiRequest<Customer>(`${this.basePath(tenantSlug)}/me/`, {
       accessToken,
       signal,
+    });
+  }
+
+  updateProfile(
+    tenantSlug: string,
+    accessToken: string,
+    profile: { name: string; email: string },
+  ) {
+    return apiRequest<Customer>(`${this.basePath(tenantSlug)}/me/`, {
+      method: "PATCH",
+      accessToken,
+      body: profile,
+    });
+  }
+
+  changePassword(
+    tenantSlug: string,
+    accessToken: string,
+    passwords: { current_password: string; new_password: string },
+  ) {
+    return apiRequest<void>(`${this.basePath(tenantSlug)}/password/`, {
+      method: "POST",
+      accessToken,
+      body: passwords,
     });
   }
 }

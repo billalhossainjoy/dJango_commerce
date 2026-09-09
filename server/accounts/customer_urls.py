@@ -3,6 +3,7 @@ from django.urls import path
 from accounts.views import (
     CustomerCurrentUserView,
     CustomerLogoutView,
+    CustomerPasswordView,
     CustomerRefreshView,
     CustomerSignupView,
     TenantLoginView,
@@ -14,4 +15,9 @@ urlpatterns = [
     path("refresh/", CustomerRefreshView.as_view(), name="customer-auth-refresh"),
     path("logout/", CustomerLogoutView.as_view(), name="customer-auth-logout"),
     path("me/", CustomerCurrentUserView.as_view(), name="customer-auth-me"),
+    path(
+        "password/",
+        CustomerPasswordView.as_view(),
+        name="customer-auth-password",
+    ),
 ]

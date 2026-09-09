@@ -30,20 +30,25 @@ export function AccountShell({
 }) {
   const pathname = usePathname();
   const customer = useCurrentCustomer(tenantSlug);
+  const name = customer.data?.name.trim();
   const email = customer.data?.email;
+  const accountLabel = name || email;
 
   return (
     <AccountTenantContext.Provider value={tenantSlug}>
       <div className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14">
         <div className="flex items-center gap-4">
           <div className="grid size-12 shrink-0 place-items-center rounded-full bg-zinc-950 text-lg font-semibold text-white">
-            {email?.charAt(0).toUpperCase() ?? "A"}
+            {accountLabel?.charAt(0).toUpperCase() ?? "A"}
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-zinc-500">My account</p>
             <h1 className="truncate text-2xl font-semibold tracking-tight text-zinc-950">
-              {email ?? "Customer account"}
+              {accountLabel ?? "Customer account"}
             </h1>
+            {name && email ? (
+              <p className="truncate text-sm text-zinc-500">{email}</p>
+            ) : null}
           </div>
         </div>
 

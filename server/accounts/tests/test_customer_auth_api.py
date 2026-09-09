@@ -70,6 +70,7 @@ def test_customer_can_signup_login_refresh_get_current_user_and_logout(
     assert me_response.status_code == 200
     assert me_response.json() == {
         "id": str(customer.id),
+        "name": "",
         "email": "buyer@example.com",
         "account_type": User.AccountType.CUSTOMER,
         "tenant": {
@@ -98,6 +99,88 @@ def test_customer_can_signup_login_refresh_get_current_user_and_logout(
 
     rejected_refresh = client.post(customer_url("customer-auth-refresh", active_tenant))
     assert rejected_refresh.status_code == 401
+
+
+@pytest.mark.django_db
+def test_customer_updates_profile(client, active_tenant):
+    customer = User.objects.create_user(
+        email="buyer@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.CUSTOMER,
+        tenant=active_tenant,
+    )
+    access = client.post(
+        customer_url("customer-auth-login", active_tenant),
+        data={"email": customer.email, "password": PASSWORD},
+    ).json()["access"]
+
+    response = client.patch(
+        customer_url("customer-auth-me", active_tenant),
+        data={"name": "  Sam Buyer  ", "email": "SAM@example.com"},
+        content_type="application/json",
+        headers={"authorization": f"Bearer {access}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Sam Buyer"
+    assert response.json()["email"] == "sam@example.com"
+    customer.refresh_from_db()
+    assert customer.name == "Sam Buyer"
+    assert customer.email == "sam@example.com"
+
+
+@pytest.mark.django_db
+def test_customer_changes_password_with_current_password(client, active_tenant):
+    customer = User.objects.create_user(
+        email="buyer@example.com",
+        password=PASSWORD,
+        account_type=User.AccountType.CUSTOMER,
+        tenant=active_tenant,
+    )
+    access = client.post(
+        customer_url("customer-auth-login", active_tenant),
+        data={"email": customer.email, "password": PASSWORD},
+    ).json()["access"]
+    url = customer_url("customer-auth-password", active_tenant)
+    headers = {"authorization": f"Bearer {access}"}
+
+    rejected = client.post(
+        url,
+        data={
+            "current_password": "incorrect-password",
+            "new_password": "another-strong-password-456",
+        },
+        headers=headers,
+    )
+    changed = client.post(
+        url,
+        data={
+            "current_password": PASSWORD,
+            "new_password": "another-strong-password-456",
+        },
+        headers=headers,
+    )
+
+    assert rejected.status_code == 400
+    assert rejected.json() == {"current_password": ["Current password is incorrect."]}
+    assert changed.status_code == 204
+    assert (
+        client.post(
+            customer_url("customer-auth-login", active_tenant),
+            data={"email": customer.email, "password": PASSWORD},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            customer_url("customer-auth-login", active_tenant),
+            data={
+                "email": customer.email,
+                "password": "another-strong-password-456",
+            },
+        ).status_code
+        == 200
+    )
 
 
 @pytest.mark.django_db

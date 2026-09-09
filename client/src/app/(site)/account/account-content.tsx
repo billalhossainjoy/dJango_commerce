@@ -23,7 +23,7 @@ export function AccountContent() {
           Overview
         </p>
         <h2 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
-          Welcome back
+          Welcome back{customer.data.name ? `, ${customer.data.name}` : ""}
         </h2>
         <p className="mt-2 text-zinc-600">
           Review your orders and manage your customer account.
@@ -56,7 +56,7 @@ export function AccountContent() {
             {customer.data.email}
           </h3>
           <p className="mt-2 text-sm leading-6 text-zinc-600">
-            Review your identity, store membership, and session settings.
+            Update your name, email address, password, and session.
           </p>
           <span className="mt-6 inline-block text-sm font-semibold text-indigo-700 group-hover:text-indigo-800">
             Manage settings →
