@@ -1,12 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 
 import { useStorefrontProducts } from "@/app/(site)/products/use-products";
 import { StorefrontProductCard } from "@/components/storefront-product-card";
 import { useTenantQuery } from "@/hooks/use-tenant-query";
-import { formatUsd } from "@/lib/format";
 
 export function Storefront({ tenantSlug }: { tenantSlug: string | null }) {
   const tenant = useTenantQuery(tenantSlug);
@@ -48,34 +46,29 @@ export function Storefront({ tenantSlug }: { tenantSlug: string | null }) {
     );
   }
 
-  const featuredProduct = products.data?.[0];
-
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950">
       <section className="relative overflow-hidden bg-zinc-950 text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(79,70,229,0.35),transparent_40%)]" />
-        <div
-          className={`relative mx-auto grid max-w-7xl items-center gap-12 px-6 py-16 sm:py-24 ${
-            featuredProduct ? "lg:grid-cols-2" : ""
-          }`}
-        >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(99,102,241,0.24),transparent_32%),radial-gradient(circle_at_85%_85%,rgba(168,85,247,0.18),transparent_30%)]" />
+        <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-6 py-16 sm:py-24 lg:grid-cols-[minmax(0,1.05fr)_minmax(380px,0.95fr)] lg:py-28">
           <div className="max-w-2xl">
             <p className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-200">
-              {tenant.data.slug} storefront
+              Welcome to {tenant.data.name}
             </p>
-            <h1 className="mt-6 text-5xl font-semibold tracking-tight sm:text-6xl">
-              Find your next favorite from {tenant.data.name}.
+            <h1 className="mt-7 text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
+              Thoughtful finds for everyday life.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-zinc-300">
-              Browse our current collection and discover products available
-              directly from our store.
+              Explore a carefully selected collection from {tenant.data.name},
+              with a simple and secure shopping experience from discovery to
+              delivery.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-4">
               <Link
                 href="#products"
                 className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-indigo-50"
               >
-                Shop products
+                Explore the collection
               </Link>
               <Link
                 href="/account"
@@ -84,46 +77,31 @@ export function Storefront({ tenantSlug }: { tenantSlug: string | null }) {
                 My account
               </Link>
             </div>
+            <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 border-t border-white/10 pt-6 text-sm text-zinc-400">
+              <span>Curated selection</span>
+              <span>Secure checkout</span>
+              <span>Direct from the store</span>
+            </div>
           </div>
 
-          {featuredProduct ? (
-            <Link
-              href={`/products/${featuredProduct.slug}`}
-              className="group relative mx-auto w-full max-w-lg overflow-hidden rounded-3xl border border-white/15 bg-white/10 p-3 shadow-2xl shadow-indigo-950/40"
-            >
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-zinc-800">
-                {featuredProduct.images[0]?.url ? (
-                  <Image
-                    src={featuredProduct.images[0].url}
-                    alt={
-                      featuredProduct.images[0].alt_text || featuredProduct.name
-                    }
-                    fill
-                    priority
-                    unoptimized
-                    className="object-cover transition duration-500 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-zinc-500">
-                    No image
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center justify-between gap-4 px-2 pb-2 pt-5">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-indigo-200">
-                    Featured product
-                  </p>
-                  <h2 className="mt-1 text-xl font-semibold">
-                    {featuredProduct.name}
-                  </h2>
-                </div>
-                <p className="text-lg font-semibold">
-                  {formatUsd(featuredProduct.price_cents)}
+          <div className="relative mx-auto aspect-[4/5] w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/15 bg-gradient-to-br from-indigo-500/25 via-white/5 to-fuchsia-500/20 p-8 shadow-2xl shadow-black/30 sm:aspect-[5/4] lg:aspect-[4/5]">
+            <div className="absolute -right-20 -top-20 size-64 rounded-full border border-white/10 bg-indigo-400/10" />
+            <div className="absolute -bottom-24 -left-16 size-72 rounded-full border border-white/10 bg-fuchsia-400/10" />
+            <div className="relative flex h-full flex-col justify-between rounded-3xl border border-white/10 bg-white/[0.06] p-7 backdrop-blur-sm">
+              <span className="w-fit rounded-full border border-white/15 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-200">
+                Online store
+              </span>
+              <div>
+                <p className="text-sm uppercase tracking-[0.22em] text-zinc-400">
+                  Discover something new
                 </p>
+                <p className="mt-3 text-4xl font-semibold tracking-tight text-white">
+                  {tenant.data.name}
+                </p>
+                <div className="mt-6 h-px w-20 bg-indigo-300/70" />
               </div>
-            </Link>
-          ) : null}
+            </div>
+          </div>
         </div>
       </section>
 

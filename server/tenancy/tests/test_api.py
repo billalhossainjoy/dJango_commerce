@@ -4,7 +4,7 @@ from django.urls import reverse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
-from tenancy.models import Tenant, TenantOwner
+from tenancy.models import Tenant, TenantHostname, TenantOwner
 
 
 @pytest.mark.django_db
@@ -146,3 +146,94 @@ def test_owner_cannot_activate_another_tenant(client):
     assert response.status_code == 404
     other_tenant.refresh_from_db()
     assert other_tenant.status == Tenant.Status.PROVISIONING
+
+
+@pytest.mark.django_db
+@override_settings(PLATFORM_ROOT_DOMAIN="localhost")
+def test_owner_updates_store_name_and_subdomain(client):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    tenant = Tenant.objects.create(slug="old-store", name="Old Store")
+    TenantOwner.objects.create(user=owner, tenant=tenant)
+    hostname = TenantHostname.objects.create(
+        tenant=tenant,
+        hostname="old-store.localhost",
+    )
+    access_token = str(RefreshToken.for_user(owner).access_token)
+
+    response = client.patch(
+        reverse("tenant-settings", kwargs={"tenant_slug": tenant.slug}),
+        data={"name": "New Store", "slug": "new-store"},
+        content_type="application/json",
+        headers={"authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "name": "New Store",
+        "slug": "new-store",
+        "subdomain": "new-store.localhost",
+    }
+    tenant.refresh_from_db()
+    hostname.refresh_from_db()
+    assert tenant.name == "New Store"
+    assert hostname.hostname == "new-store.localhost"
+
+
+@pytest.mark.django_db
+def test_owner_cannot_use_an_existing_or_reserved_subdomain(client):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    tenant = Tenant.objects.create(slug="owned", name="Owned Store")
+    Tenant.objects.create(slug="taken", name="Taken Store")
+    TenantOwner.objects.create(user=owner, tenant=tenant)
+    access_token = str(RefreshToken.for_user(owner).access_token)
+    url = reverse("tenant-settings", kwargs={"tenant_slug": tenant.slug})
+    headers = {"authorization": f"Bearer {access_token}"}
+
+    duplicate = client.patch(
+        url,
+        data={"slug": "taken"},
+        content_type="application/json",
+        headers=headers,
+    )
+    reserved = client.patch(
+        url,
+        data={"slug": "www"},
+        content_type="application/json",
+        headers=headers,
+    )
+
+    assert duplicate.status_code == 400
+    assert duplicate.json() == {"slug": ["This subdomain is already taken."]}
+    assert reserved.status_code == 400
+    assert "reserved subdomains" in reserved.json()["slug"][0]
+
+
+@pytest.mark.django_db
+def test_owner_cannot_update_another_tenant_settings(client):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    owned_tenant = Tenant.objects.create(slug="owned", name="Owned Store")
+    other_tenant = Tenant.objects.create(slug="other", name="Other Store")
+    TenantOwner.objects.create(user=owner, tenant=owned_tenant)
+    access_token = str(RefreshToken.for_user(owner).access_token)
+
+    response = client.patch(
+        reverse("tenant-settings", kwargs={"tenant_slug": other_tenant.slug}),
+        data={"name": "Changed"},
+        headers={"authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    other_tenant.refresh_from_db()
+    assert other_tenant.name == "Other Store"

@@ -1,6 +1,11 @@
 from django.urls import path
 
-from tenancy.views import activate_tenant, owner_login_context, tenant_context
+from tenancy.views import (
+    TenantSettingsView,
+    activate_tenant,
+    owner_login_context,
+    tenant_context,
+)
 
 urlpatterns = [
     path(
@@ -12,6 +17,11 @@ urlpatterns = [
         "tenants/<slug:tenant_slug>/activate/",
         activate_tenant,
         name="tenant-activate",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/settings/",
+        TenantSettingsView.as_view(),
+        name="tenant-settings",
     ),
     path(
         "tenants/<slug:tenant_slug>/owner-login-context/",

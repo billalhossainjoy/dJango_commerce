@@ -1,13 +1,21 @@
 from typing import cast
 
+from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from accounts.models import User
+from accounts.permissions import IsPlatformUser
 from tenancy.models import Tenant
-from tenancy.serializers import TenantLoginContextSerializer, TenantSummarySerializer
+from tenancy.serializers import (
+    TenantLoginContextSerializer,
+    TenantSettingsSerializer,
+    TenantSummarySerializer,
+)
 
 
 @api_view(["GET"])
@@ -56,3 +64,20 @@ def activate_tenant(request: Request, tenant_slug: str) -> Response:
         tenant.save(update_fields=["status", "updated_at"])
 
     return Response(TenantSummarySerializer(tenant).data)
+
+
+class TenantSettingsView(RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated, IsPlatformUser]
+    serializer_class = TenantSettingsSerializer
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def get_object(self) -> Tenant:
+        return get_object_or_404(
+            Tenant,
+            slug=self.kwargs["tenant_slug"],
+            ownership__user=cast(User, self.request.user),
+        )
+
+    @transaction.atomic
+    def perform_update(self, serializer) -> None:
+        serializer.save()
