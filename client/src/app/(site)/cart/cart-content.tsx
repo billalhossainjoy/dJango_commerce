@@ -202,13 +202,12 @@ export function CartContent({ tenantSlug }: { tenantSlug: string }) {
               <p className="mt-4 text-xs leading-5 text-zinc-500">
                 Shipping and final totals will be calculated during checkout.
               </p>
-              <button
-                type="button"
-                disabled
-                className="mt-6 h-12 w-full cursor-not-allowed rounded-xl bg-zinc-300 px-5 text-sm font-semibold text-white"
+              <Link
+                href="/checkout"
+                className="mt-6 grid h-12 w-full place-items-center rounded-xl bg-zinc-950 px-5 text-sm font-semibold text-white transition hover:bg-indigo-700"
               >
-                Checkout coming next
-              </button>
+                Continue to checkout
+              </Link>
             </aside>
           </div>
         )}

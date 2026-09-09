@@ -86,12 +86,18 @@ class CartItem(models.Model):
 class Order(models.Model):
     class Status(models.TextChoices):
         PENDING_PAYMENT = "pending_payment", "Pending payment"
+        CONFIRMED = "confirmed", "Confirmed"
         PAID = "paid", "Paid"
         CANCELLED = "cancelled", "Cancelled"
 
+    class PaymentMethod(models.TextChoices):
+        CASH_ON_DELIVERY = "cash_on_delivery", "Cash on delivery"
+
     class FulfillmentStatus(models.TextChoices):
         UNFULFILLED = "unfulfilled", "Unfulfilled"
-        FULFILLED = "fulfilled", "Fulfilled"
+        PROCESSING = "processing", "Processing"
+        SHIPPED = "shipped", "Shipped"
+        DELIVERED = "delivered", "Delivered"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(
@@ -112,7 +118,12 @@ class Order(models.Model):
     status = models.CharField(
         max_length=20,
         choices=Status,
-        default=Status.PENDING_PAYMENT,
+        default=Status.CONFIRMED,
+    )
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod,
+        default=PaymentMethod.CASH_ON_DELIVERY,
     )
     fulfillment_status = models.CharField(
         max_length=20,

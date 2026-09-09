@@ -120,3 +120,36 @@ def create_order_from_cart(
 
     cart.delete()
     return order
+
+
+@transaction.atomic
+def cancel_order(order: Order) -> Order:
+    order = Order.objects.select_for_update().get(id=order.id)
+    if order.status == Order.Status.CANCELLED:
+        return order
+    if order.status != Order.Status.CONFIRMED:
+        raise ValidationError({"status": "This order cannot be cancelled."})
+    if order.fulfillment_status not in {
+        Order.FulfillmentStatus.UNFULFILLED,
+        Order.FulfillmentStatus.PROCESSING,
+    }:
+        raise ValidationError(
+            {"status": "An order cannot be cancelled after it has shipped."}
+        )
+
+    items = list(order.items.exclude(product__isnull=True))
+    products = {
+        product.id: product
+        for product in Product.objects.select_for_update().filter(
+            id__in=[item.product_id for item in items]
+        )
+    }
+    for item in items:
+        product = products.get(item.product_id)
+        if product:
+            product.stock_quantity += item.quantity
+            product.save(update_fields=["stock_quantity", "updated_at"])
+
+    order.status = Order.Status.CANCELLED
+    order.save(update_fields=["status", "updated_at"])
+    return order

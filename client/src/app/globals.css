@@ -57,7 +57,8 @@ body {
 
 /* Account and authentication pages share the storefront's light palette. */
 .account-theme,
-.auth-theme {
+.auth-theme,
+.checkout-theme {
   color-scheme: light;
   --background: #fafafa;
   --foreground: #18181b;

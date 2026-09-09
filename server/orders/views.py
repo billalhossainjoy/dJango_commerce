@@ -6,24 +6,31 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import User
-from accounts.permissions import IsCustomerForTenant
+from accounts.permissions import IsCustomerForTenant, IsPlatformUser
 from catalog.models import Product
 from orders.models import Cart, CartItem, Order
 from orders.permissions import IsGuestOrTenantCustomer
 from orders.serializers import (
     AddCartItemSerializer,
+    AdminOrderStatusSerializer,
     CartSerializer,
     CreateOrderSerializer,
     OrderSerializer,
     UpdateCartItemSerializer,
 )
-from orders.services import cart_queryset, create_order_from_cart, get_request_cart
+from orders.services import (
+    cancel_order,
+    cart_queryset,
+    create_order_from_cart,
+    get_request_cart,
+)
 from tenancy.models import Tenant
 
 
@@ -37,6 +44,12 @@ def active_tenant(tenant_slug: str) -> Tenant:
 
 def empty_cart() -> dict[str, object]:
     return {"id": None, "items": [], "item_count": 0, "subtotal_cents": 0}
+
+
+def order_owner_filter(request: Request) -> dict[str, object]:
+    if request.user.is_authenticated:
+        return {"customer": cast(User, request.user)}
+    return {"customer": None, "session_key": request.session.session_key or ""}
 
 
 def current_cart(request: Request, tenant_slug: str) -> Cart:
@@ -205,17 +218,12 @@ class OrderCreateView(APIView):
                 {"idempotency_key": "Provide a valid Idempotency-Key header."}
             )
 
-        owner_filter = (
-            {"customer": cast(User, request.user)}
-            if request.user.is_authenticated
-            else {"customer": None, "session_key": request.session.session_key or ""}
-        )
         existing_order = (
             Order.objects.prefetch_related("items")
             .filter(
                 tenant=tenant,
                 idempotency_key=idempotency_key,
-                **owner_filter,
+                **order_owner_filter(request),
             )
             .first()
         )
@@ -237,3 +245,97 @@ class OrderCreateView(APIView):
         )
         order = Order.objects.prefetch_related("items").get(id=order.id)
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+
+
+class OrderDetailView(APIView):
+    permission_classes = [IsGuestOrTenantCustomer]
+
+    def get(
+        self,
+        request: Request,
+        tenant_slug: str,
+        order_id: uuid.UUID,
+    ) -> Response:
+        order = get_object_or_404(
+            Order.objects.prefetch_related("items"),
+            id=order_id,
+            tenant=active_tenant(tenant_slug),
+            **order_owner_filter(request),
+        )
+        return Response(OrderSerializer(order).data)
+
+
+def admin_orders(tenant_slug: str, owner: User):
+    tenant = get_object_or_404(
+        Tenant,
+        slug=tenant_slug,
+        ownership__user=owner,
+    )
+    return Order.objects.filter(tenant=tenant).prefetch_related("items")
+
+
+class AdminOrderListView(ListAPIView):
+    permission_classes = [IsAuthenticated, IsPlatformUser]
+    serializer_class = OrderSerializer
+
+    def get_queryset(self):
+        return admin_orders(
+            self.kwargs["tenant_slug"],
+            cast(User, self.request.user),
+        )
+
+
+class AdminOrderDetailView(RetrieveAPIView):
+    permission_classes = [IsAuthenticated, IsPlatformUser]
+    serializer_class = OrderSerializer
+    lookup_url_kwarg = "order_id"
+
+    def get_queryset(self):
+        return admin_orders(
+            self.kwargs["tenant_slug"],
+            cast(User, self.request.user),
+        )
+
+
+class AdminOrderStatusView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformUser]
+
+    def patch(
+        self,
+        request: Request,
+        tenant_slug: str,
+        order_id: uuid.UUID,
+    ) -> Response:
+        owner = cast(User, request.user)
+        with transaction.atomic():
+            order = get_object_or_404(
+                admin_orders(tenant_slug, owner).select_for_update(),
+                id=order_id,
+            )
+            serializer = AdminOrderStatusSerializer(
+                order,
+                data=request.data,
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+        order = Order.objects.prefetch_related("items").get(id=order.id)
+        return Response(OrderSerializer(order).data)
+
+
+class AdminOrderCancelView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformUser]
+
+    def post(
+        self,
+        request: Request,
+        tenant_slug: str,
+        order_id: uuid.UUID,
+    ) -> Response:
+        order = get_object_or_404(
+            admin_orders(tenant_slug, cast(User, request.user)),
+            id=order_id,
+        )
+        order = cancel_order(order)
+        order = Order.objects.prefetch_related("items").get(id=order.id)
+        return Response(OrderSerializer(order).data)

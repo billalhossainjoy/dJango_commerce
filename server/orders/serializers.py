@@ -88,6 +88,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "status",
+            "payment_method",
             "fulfillment_status",
             "email",
             "shipping_name",
@@ -103,3 +104,30 @@ class OrderSerializer(serializers.ModelSerializer):
             "items",
             "created_at",
         )
+
+
+class AdminOrderStatusSerializer(serializers.ModelSerializer):
+    transitions = {
+        Order.FulfillmentStatus.UNFULFILLED: Order.FulfillmentStatus.PROCESSING,
+        Order.FulfillmentStatus.PROCESSING: Order.FulfillmentStatus.SHIPPED,
+        Order.FulfillmentStatus.SHIPPED: Order.FulfillmentStatus.DELIVERED,
+    }
+
+    class Meta:
+        model = Order
+        fields = ("fulfillment_status",)
+
+    def validate_fulfillment_status(self, value: str) -> str:
+        order = self.instance
+        if order is None or value == order.fulfillment_status:
+            return value
+        if order.status == Order.Status.CANCELLED:
+            raise serializers.ValidationError(
+                "A cancelled order cannot be moved through fulfillment."
+            )
+        expected = self.transitions.get(order.fulfillment_status)
+        if value != expected:
+            raise serializers.ValidationError(
+                "Order fulfillment must move to the next status."
+            )
+        return value
