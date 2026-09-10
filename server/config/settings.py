@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -11,14 +12,25 @@ ENVIRONMENT = os.environ.get("DJANGO_ENVIRONMENT", "development")
 ENV_FILE = Path(
     os.environ.get("DJANGO_ENV_FILE", REPOSITORY_ROOT / f".env.{ENVIRONMENT}")
 )
+LOCAL_ENV_FILE = Path(
+    os.environ.get(
+        "DJANGO_LOCAL_ENV_FILE",
+        REPOSITORY_ROOT / f".env.{ENVIRONMENT}.local",
+    )
+)
 
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, []),
+    CORS_ALLOWED_ORIGINS=(list, []),
+    CORS_ALLOWED_ORIGIN_REGEXES=(list, []),
     DATABASE_CONN_MAX_AGE=(int, 0),
 )
 
-# Environment variables supplied by the runtime win over values in the file.
+# Runtime variables win over local secrets, and local secrets win over the
+# tracked environment defaults.
+if LOCAL_ENV_FILE.is_file():
+    environ.Env.read_env(LOCAL_ENV_FILE, overwrite=False)
 if ENV_FILE.is_file():
     environ.Env.read_env(ENV_FILE, overwrite=False)
 
@@ -31,6 +43,12 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+PLATFORM_ROOT_DOMAIN = env("PLATFORM_ROOT_DOMAIN", default="localhost")
+
+CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
+CORS_ALLOWED_ORIGIN_REGEXES = env("CORS_ALLOWED_ORIGIN_REGEXES")
+CORS_ALLOW_CREDENTIALS = True
+CORS_URLS_REGEX = r"^/api/.*$"
 
 
 # Application definition
@@ -42,10 +60,20 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
+    "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "tenancy",
+    "accounts",
+    "catalog",
+    "customers",
+    "orders",
+    "billing",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -121,6 +149,26 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 
+# Product media
+
+CLOUDINARY_CLOUD_NAME = env.str("CLOUDINARY_CLOUD_NAME", default="")
+CLOUDINARY_API_KEY = env.str("CLOUDINARY_API_KEY", default="")
+CLOUDINARY_API_SECRET = env.str("CLOUDINARY_API_SECRET", default="")
+CLOUDINARY_UPLOAD_PRESET = env.str("CLOUDINARY_UPLOAD_PRESET", default="")
+
+# Platform subscriptions
+
+STRIPE_SECRET_KEY = env.str("STRIPE_SECRET_KEY", default="")
+STRIPE_WEBHOOK_SECRET = env.str("STRIPE_WEBHOOK_SECRET", default="")
+STRIPE_PRICE_ID = env.str("STRIPE_PRICE_ID", default="")
+STRIPE_TRIAL_DAYS = env.int("STRIPE_TRIAL_DAYS", default=14)
+STRIPE_BILLING_ENFORCED = env.bool("STRIPE_BILLING_ENFORCED", default=False)
+PLATFORM_FRONTEND_ORIGIN = env.str(
+    "PLATFORM_FRONTEND_ORIGIN",
+    default="http://localhost:3000",
+)
+
+
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
@@ -129,3 +177,40 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
+
+
+AUTH_USER_MODEL = "accounts.User"
+
+AUTHENTICATION_BACKENDS = [
+    "accounts.backends.PlatformAuthenticationBackend",
+]
+
+# Email uniqueness is enforced by conditional database constraints: globally for
+# platform users and per tenant for customers. The platform authentication
+# backend applies the matching account-type scope before looking up a user.
+SILENCED_SYSTEM_CHECKS = ["auth.W004"]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "tenant_login": "5/minute",
+        "customer_signup": "3/hour",
+    },
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
+JWT_PLATFORM_REFRESH_COOKIE_NAME = "platform_refresh_token"
+JWT_CUSTOMER_REFRESH_COOKIE_NAME = "customer_refresh_token"
+JWT_REFRESH_COOKIE_MAX_AGE = int(timedelta(days=7).total_seconds())
+JWT_REFRESH_COOKIE_SECURE = not DEBUG
+JWT_PLATFORM_REFRESH_COOKIE_DOMAIN = (
+    env.str("JWT_PLATFORM_REFRESH_COOKIE_DOMAIN", default="") or None
+)

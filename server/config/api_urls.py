@@ -1,0 +1,21 @@
+from django.urls import include, path
+
+from config.views import health, readiness
+
+urlpatterns = [
+    path("health/", health, name="api-health"),
+    path("readiness/", readiness, name="api-readiness"),
+    path("auth/", include("accounts.urls")),
+    path("", include("billing.urls")),
+    path(
+        "tenants/<slug:tenant_slug>/auth/",
+        include("accounts.customer_urls"),
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/",
+        include("customers.urls"),
+    ),
+    path("", include("tenancy.urls")),
+    path("", include("catalog.urls")),
+    path("", include("orders.urls")),
+]

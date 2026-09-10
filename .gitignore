@@ -22,7 +22,11 @@ client/*.tsbuildinfo
 # Editors and operating systems
 .DS_Store
 .idea/
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
 
-# Private local planning documents
-docs/PRIVATE_IMPLEMENTATION_PLAN.md
+# Local project documentation and planning
+/docs/

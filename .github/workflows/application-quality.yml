@@ -2,7 +2,17 @@ name: Application quality
 
 on:
   push:
+    branches:
+      - main
+      - dev
   pull_request:
+    branches:
+      - main
+      - dev
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -79,6 +89,9 @@ jobs:
 
       - name: Check Python formatting
         run: uv run --project server ruff format --check server
+
+      - name: Check Python types
+        run: uv run --project server mypy --config-file server/pyproject.toml server
 
       - name: Check Django configuration
         run: uv run --project server python server/manage.py check

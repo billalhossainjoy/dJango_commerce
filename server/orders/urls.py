@@ -1,0 +1,67 @@
+from django.urls import path
+
+from orders.views import (
+    AdminOrderCancelView,
+    AdminOrderDetailView,
+    AdminOrderListView,
+    AdminOrderStatusView,
+    CartClaimView,
+    CartDetailView,
+    CartItemCreateView,
+    CartItemDetailView,
+    OrderCreateView,
+    OrderDetailView,
+)
+
+urlpatterns = [
+    path(
+        "tenants/<slug:tenant_slug>/admin/orders/",
+        AdminOrderListView.as_view(),
+        name="admin-order-list",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/orders/<uuid:order_id>/",
+        AdminOrderDetailView.as_view(),
+        name="admin-order-detail",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/orders/<uuid:order_id>/status/",
+        AdminOrderStatusView.as_view(),
+        name="admin-order-status",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/admin/orders/<uuid:order_id>/cancel/",
+        AdminOrderCancelView.as_view(),
+        name="admin-order-cancel",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/cart/",
+        CartDetailView.as_view(),
+        name="cart-detail",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/cart/claim/",
+        CartClaimView.as_view(),
+        name="cart-claim",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/cart/items/",
+        CartItemCreateView.as_view(),
+        name="cart-item-create",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/cart/items/<uuid:item_id>/",
+        CartItemDetailView.as_view(),
+        name="cart-item-detail",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/orders/",
+        OrderCreateView.as_view(),
+        name="order-create",
+    ),
+    path(
+        "tenants/<slug:tenant_slug>/orders/<uuid:order_id>/",
+        OrderDetailView.as_view(),
+        name="order-detail",
+    ),
+]
