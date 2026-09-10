@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from accounts.models import User
 from accounts.permissions import IsPlatformUser
+from billing.access import tenant_has_billing_access
 from tenancy.models import Tenant
 from tenancy.serializers import (
     TenantLoginContextSerializer,
@@ -25,7 +26,7 @@ def tenant_context(request: Request, tenant_slug: str) -> Response:
         slug=tenant_slug,
         status=Tenant.Status.ACTIVE,
     ).first()
-    if tenant is None:
+    if tenant is None or not tenant_has_billing_access(tenant):
         return Response({"detail": "Tenant not found."}, status=404)
 
     return Response(TenantSummarySerializer(tenant).data)
@@ -52,6 +53,12 @@ def activate_tenant(request: Request, tenant_slug: str) -> Response:
     ).first()
     if tenant is None:
         return Response({"detail": "Tenant not found."}, status=404)
+
+    if not tenant_has_billing_access(tenant):
+        return Response(
+            {"detail": "Start a trial or subscription before activating this store."},
+            status=409,
+        )
 
     if tenant.status in {Tenant.Status.SUSPENDED, Tenant.Status.CLOSED}:
         return Response(

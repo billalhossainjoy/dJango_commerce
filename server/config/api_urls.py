@@ -6,6 +6,7 @@ urlpatterns = [
     path("health/", health, name="api-health"),
     path("readiness/", readiness, name="api-readiness"),
     path("auth/", include("accounts.urls")),
+    path("", include("billing.urls")),
     path(
         "tenants/<slug:tenant_slug>/auth/",
         include("accounts.customer_urls"),

@@ -25,6 +25,7 @@ from accounts.serializers import (
     refresh_token_for,
 )
 from accounts.throttles import CustomerSignupThrottle, TenantLoginThrottle
+from billing.access import tenant_has_billing_access
 from tenancy.models import Tenant
 
 PLATFORM_COOKIE_PATH = "/api/v1/auth/"
@@ -167,6 +168,10 @@ def active_tenant(tenant_slug: str) -> Tenant:
     tenant = Tenant.objects.filter(slug=tenant_slug).first()
     if tenant is None:
         raise NotFound("Store not found. Check the store address and try again.")
+    if not tenant_has_billing_access(tenant):
+        raise NotFound(
+            "This store is currently unavailable. Please contact the store owner."
+        )
     if tenant.status == Tenant.Status.PROVISIONING:
         raise NotFound(
             "This store is not open yet. The store owner must activate it "

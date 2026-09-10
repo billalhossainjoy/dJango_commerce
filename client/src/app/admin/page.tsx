@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 
 import { AppService, type CurrentUser } from "@/app/app.service";
 import { Button } from "@/components/ui/button";
@@ -8,11 +9,13 @@ import {
   currentUserQueryKey,
   useCurrentUser,
 } from "@/hooks/use-current-user";
+import { ApiError } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 
 const appService = new AppService();
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useCurrentUser();
@@ -25,6 +28,11 @@ export default function AdminDashboardPage() {
           ? { ...user, tenant: { ...user.tenant, ...tenant } }
           : user,
       );
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 409) {
+        router.push("/admin/billing?subscription=required");
+      }
     },
   });
 

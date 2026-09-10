@@ -1,6 +1,7 @@
 import uuid
 from typing import Any, cast
 
+from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.db.models import Prefetch
@@ -21,6 +22,7 @@ from rest_framework.views import APIView
 
 from accounts.models import User
 from accounts.permissions import IsPlatformUser
+from billing.access import BILLING_ACCESS_STATUSES
 from catalog.models import Product, ProductImage
 from catalog.serializers import (
     AdminProductImageSerializer,
@@ -64,11 +66,16 @@ def products_with_ready_images():
 
 
 def public_products(tenant_slug: str):
-    return products_with_ready_images().filter(
+    products = products_with_ready_images().filter(
         tenant__slug=tenant_slug,
         tenant__status=Tenant.Status.ACTIVE,
         is_active=True,
     )
+    if settings.STRIPE_BILLING_ENFORCED:
+        products = products.filter(
+            tenant__subscription__status__in=BILLING_ACCESS_STATUSES,
+        )
+    return products
 
 
 class ProductImageStorageUnavailable(APIException):

@@ -4,6 +4,7 @@ from django.urls import reverse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
+from billing.models import TenantSubscription
 from tenancy.models import Tenant, TenantHostname, TenantOwner
 
 
@@ -40,6 +41,27 @@ def test_tenant_context_returns_not_found_for_unknown_slug(client):
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Tenant not found."}
+
+
+@pytest.mark.django_db
+@override_settings(STRIPE_BILLING_ENFORCED=True)
+def test_tenant_context_requires_active_subscription(client):
+    tenant = Tenant.objects.create(
+        slug="demo",
+        name="Demo Store",
+        status=Tenant.Status.ACTIVE,
+    )
+    url = reverse("tenant-context", kwargs={"tenant_slug": tenant.slug})
+
+    unavailable = client.get(url)
+    TenantSubscription.objects.create(
+        tenant=tenant,
+        status=TenantSubscription.Status.TRIALING,
+    )
+    available = client.get(url)
+
+    assert unavailable.status_code == 404
+    assert available.status_code == 200
 
 
 @pytest.mark.django_db
@@ -124,6 +146,35 @@ def test_owner_can_activate_their_provisioning_tenant(client):
     assert response.json()["status"] == Tenant.Status.ACTIVE
     tenant.refresh_from_db()
     assert tenant.status == Tenant.Status.ACTIVE
+
+
+@pytest.mark.django_db
+@override_settings(STRIPE_BILLING_ENFORCED=True)
+def test_owner_needs_subscription_to_activate_tenant(client):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    tenant = Tenant.objects.create(slug="demo", name="Demo Store")
+    TenantOwner.objects.create(user=owner, tenant=tenant)
+    access_token = str(RefreshToken.for_user(owner).access_token)
+    url = reverse("tenant-activate", kwargs={"tenant_slug": tenant.slug})
+    headers = {"authorization": f"Bearer {access_token}"}
+
+    denied = client.post(url, headers=headers)
+    TenantSubscription.objects.create(
+        tenant=tenant,
+        status=TenantSubscription.Status.TRIALING,
+    )
+    activated = client.post(url, headers=headers)
+
+    assert denied.status_code == 409
+    assert denied.json() == {
+        "detail": "Start a trial or subscription before activating this store."
+    }
+    assert activated.status_code == 200
+    assert activated.json()["status"] == Tenant.Status.ACTIVE
 
 
 @pytest.mark.django_db

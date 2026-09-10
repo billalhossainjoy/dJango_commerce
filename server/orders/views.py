@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 
 from accounts.models import User
 from accounts.permissions import IsCustomerForTenant, IsPlatformUser
+from billing.access import tenant_has_billing_access
 from catalog.models import Product
 from orders.models import Cart, CartItem, Order
 from orders.permissions import IsGuestOrTenantCustomer
@@ -35,11 +36,13 @@ from tenancy.models import Tenant
 
 
 def active_tenant(tenant_slug: str) -> Tenant:
-    return get_object_or_404(
-        Tenant,
+    tenant = Tenant.objects.filter(
         slug=tenant_slug,
         status=Tenant.Status.ACTIVE,
-    )
+    ).first()
+    if tenant is None or not tenant_has_billing_access(tenant):
+        raise Http404
+    return tenant
 
 
 def empty_cart() -> dict[str, object]:

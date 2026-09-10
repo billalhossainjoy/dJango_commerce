@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "catalog",
     "customers",
     "orders",
+    "billing",
 ]
 
 MIDDLEWARE = [
@@ -154,6 +155,18 @@ CLOUDINARY_CLOUD_NAME = env.str("CLOUDINARY_CLOUD_NAME", default="")
 CLOUDINARY_API_KEY = env.str("CLOUDINARY_API_KEY", default="")
 CLOUDINARY_API_SECRET = env.str("CLOUDINARY_API_SECRET", default="")
 CLOUDINARY_UPLOAD_PRESET = env.str("CLOUDINARY_UPLOAD_PRESET", default="")
+
+# Platform subscriptions
+
+STRIPE_SECRET_KEY = env.str("STRIPE_SECRET_KEY", default="")
+STRIPE_WEBHOOK_SECRET = env.str("STRIPE_WEBHOOK_SECRET", default="")
+STRIPE_PRICE_ID = env.str("STRIPE_PRICE_ID", default="")
+STRIPE_TRIAL_DAYS = env.int("STRIPE_TRIAL_DAYS", default=14)
+STRIPE_BILLING_ENFORCED = env.bool("STRIPE_BILLING_ENFORCED", default=False)
+PLATFORM_FRONTEND_ORIGIN = env.str(
+    "PLATFORM_FRONTEND_ORIGIN",
+    default="http://localhost:3000",
+)
 
 
 # Email
