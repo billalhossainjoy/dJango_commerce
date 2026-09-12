@@ -9,11 +9,14 @@ BILLING_ACCESS_STATUSES = {
 }
 
 
-def tenant_has_billing_access(tenant: Tenant) -> bool:
-    if not settings.STRIPE_BILLING_ENFORCED:
-        return True
-
+def tenant_has_subscription_access(tenant: Tenant) -> bool:
     return TenantSubscription.objects.filter(
         tenant=tenant,
         status__in=BILLING_ACCESS_STATUSES,
     ).exists()
+
+
+def tenant_has_billing_access(tenant: Tenant) -> bool:
+    return not settings.STRIPE_BILLING_ENFORCED or tenant_has_subscription_access(
+        tenant
+    )

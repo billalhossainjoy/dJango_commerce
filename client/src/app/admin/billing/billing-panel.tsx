@@ -159,9 +159,6 @@ export function BillingPanel() {
         </div>
       </section>
 
-      <Button variant="outline" onClick={() => void subscription.refetch()}>
-        Refresh subscription status
-      </Button>
     </div>
   );
 }

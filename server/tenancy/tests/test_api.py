@@ -135,6 +135,10 @@ def test_owner_can_activate_their_provisioning_tenant(client):
     )
     tenant = Tenant.objects.create(slug="demo", name="Demo Store")
     TenantOwner.objects.create(user=owner, tenant=tenant)
+    TenantSubscription.objects.create(
+        tenant=tenant,
+        status=TenantSubscription.Status.TRIALING,
+    )
     access_token = str(RefreshToken.for_user(owner).access_token)
 
     response = client.post(
@@ -149,7 +153,6 @@ def test_owner_can_activate_their_provisioning_tenant(client):
 
 
 @pytest.mark.django_db
-@override_settings(STRIPE_BILLING_ENFORCED=True)
 def test_owner_needs_subscription_to_activate_tenant(client):
     owner = User.objects.create_user(
         email="owner@example.com",

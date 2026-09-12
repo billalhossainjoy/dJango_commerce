@@ -16,6 +16,8 @@ export function AuthSession() {
     queryFn: () => appService.refresh(),
     retry: false,
     staleTime: Infinity,
+    refetchInterval: 10 * 60 * 1_000,
+    refetchIntervalInBackground: true,
   });
 
   useEffect(() => {
