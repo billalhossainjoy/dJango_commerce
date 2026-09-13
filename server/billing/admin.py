@@ -8,11 +8,12 @@ class TenantSubscriptionAdmin(admin.ModelAdmin):
     list_display = (
         "tenant",
         "status",
+        "trial_used",
         "trial_ends_at",
         "current_period_ends_at",
         "cancel_at_period_end",
     )
-    list_filter = ("status", "cancel_at_period_end")
+    list_filter = ("status", "trial_used", "cancel_at_period_end")
     search_fields = (
         "tenant__name",
         "tenant__slug",

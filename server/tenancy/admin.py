@@ -5,8 +5,8 @@ from tenancy.models import Tenant, TenantHostname, TenantOwner
 
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "status", "created_at")
-    list_filter = ("status",)
+    list_display = ("name", "slug", "status", "billing_required", "created_at")
+    list_filter = ("status", "billing_required")
     search_fields = ("name", "slug")
 
 

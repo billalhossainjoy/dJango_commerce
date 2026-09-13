@@ -16,14 +16,14 @@ function useBillingAccess() {
   return { accessToken, tenantSlug: currentUser.data?.tenant?.slug };
 }
 
-export function useSubscription(waitForCheckout = false) {
+export function useSubscription(waitForCheckout = false, enabled = true) {
   const { accessToken, tenantSlug } = useBillingAccess();
 
   return useQuery({
     queryKey: ["admin", tenantSlug, "billing"],
     queryFn: ({ signal }) =>
       getSubscription(tenantSlug!, accessToken!, signal),
-    enabled: Boolean(tenantSlug && accessToken),
+    enabled: Boolean(enabled && tenantSlug && accessToken),
     refetchInterval: (query) => {
       if (!waitForCheckout) return false;
       const status = query.state.data?.status;

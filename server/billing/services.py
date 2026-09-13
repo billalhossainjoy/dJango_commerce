@@ -9,7 +9,10 @@ from django.db import transaction
 from stripe.params.billing_portal import (
     SessionCreateParams as PortalSessionCreateParams,
 )
-from stripe.params.checkout import SessionCreateParams
+from stripe.params.checkout import (
+    SessionCreateParams,
+    SessionCreateParamsSubscriptionData,
+)
 
 from accounts.models import User
 from billing.models import StripeWebhookEvent, TenantSubscription
@@ -168,6 +171,10 @@ def sync_subscription(data: dict[str, Any]) -> None:
     subscription.trial_ends_at = stripe_datetime(data.get("trial_end"))
     subscription.current_period_ends_at = subscription_period_end(data)
     subscription.cancel_at_period_end = bool(data.get("cancel_at_period_end", False))
+    if status == TenantSubscription.Status.TRIALING or isinstance(
+        data.get("trial_end"), int
+    ):
+        subscription.trial_used = True
     subscription.save(
         update_fields=(
             "stripe_subscription_id",
@@ -176,6 +183,7 @@ def sync_subscription(data: dict[str, Any]) -> None:
             "trial_ends_at",
             "current_period_ends_at",
             "cancel_at_period_end",
+            "trial_used",
             "updated_at",
         )
     )
@@ -237,6 +245,11 @@ def create_checkout_session(tenant: Tenant, owner: User) -> CheckoutRedirect:
 
         origin = tenant_frontend_origin(tenant)
         tenant_id = str(tenant.id)
+        subscription_data: SessionCreateParamsSubscriptionData = {
+            "metadata": {"tenant_id": tenant_id},
+        }
+        if not subscription.trial_used:
+            subscription_data["trial_period_days"] = settings.STRIPE_TRIAL_DAYS
         params: SessionCreateParams = {
             "mode": "subscription",
             "line_items": [{"price": settings.STRIPE_PRICE_ID, "quantity": 1}],
@@ -244,10 +257,7 @@ def create_checkout_session(tenant: Tenant, owner: User) -> CheckoutRedirect:
             "cancel_url": f"{origin}/admin/billing?checkout=cancelled",
             "client_reference_id": tenant_id,
             "metadata": {"tenant_id": tenant_id},
-            "subscription_data": {
-                "trial_period_days": settings.STRIPE_TRIAL_DAYS,
-                "metadata": {"tenant_id": tenant_id},
-            },
+            "subscription_data": subscription_data,
         }
         if subscription.stripe_customer_id:
             params["customer"] = subscription.stripe_customer_id

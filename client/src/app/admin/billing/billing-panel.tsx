@@ -54,6 +54,12 @@ export function BillingPanel() {
     );
   }
 
+  const description = !subscription.data.billing_required
+    ? "Your existing store has grandfathered platform access. You can still start a Stripe subscription here."
+    : subscription.data.trial_available
+      ? "Stripe securely collects your payment method. Your first payment is due after the trial unless you cancel before it ends."
+      : "Your free trial has already been used. Stripe will start the paid subscription during Checkout.";
+
   return (
     <div className="space-y-6">
       {searchParams.get("subscription") === "required" ? (
@@ -89,17 +95,18 @@ export function BillingPanel() {
               Billing for your tenant storefront and admin workspace.
             </p>
           </div>
-          <StatusBadge status={subscription.data.status} />
+          <StatusBadge subscription={subscription.data} />
         </div>
 
         <div className="grid gap-8 p-6 lg:grid-cols-[1fr_280px]">
           <div>
             <p className="text-sm font-semibold text-slate-900">
-              Start with 14 days free
+              {subscription.data.trial_available
+                ? "Start with 14 days free"
+                : "Continue with a paid subscription"}
             </p>
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-              Stripe securely collects your payment method. Your first payment
-              is due after the trial unless you cancel before it ends.
+              {description}
             </p>
             <SubscriptionDates subscription={subscription.data} />
 
@@ -129,7 +136,9 @@ export function BillingPanel() {
                 >
                   {checkout.isPending
                     ? "Opening Stripe…"
-                    : "Start 14-day free trial"}
+                    : subscription.data.trial_available
+                      ? "Start 14-day free trial"
+                      : "Subscribe now"}
                 </Button>
               ) : null}
               {subscription.data.can_manage ? (
@@ -163,7 +172,16 @@ export function BillingPanel() {
   );
 }
 
-function StatusBadge({ status }: { status: SubscriptionStatus }) {
+function StatusBadge({ subscription }: { subscription: Subscription }) {
+  if (!subscription.billing_required) {
+    return (
+      <span className="w-fit rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+        Grandfathered access
+      </span>
+    );
+  }
+
+  const { status } = subscription;
   const healthy = status === "trialing" || status === "active";
   return (
     <span

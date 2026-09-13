@@ -283,7 +283,11 @@ class SignupSerializer(serializers.ModelSerializer):
                 **validated_data,
                 account_type=User.AccountType.PLATFORM,
             )
-            tenant = Tenant.objects.create(name=store_name, slug=slug)
+            tenant = Tenant.objects.create(
+                name=store_name,
+                slug=slug,
+                billing_required=True,
+            )
             TenantOwner.objects.create(user=user, tenant=tenant)
             TenantHostname.objects.create(
                 tenant=tenant,

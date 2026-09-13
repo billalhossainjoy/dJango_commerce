@@ -21,6 +21,7 @@ class Tenant(models.Model):
         choices=Status,
         default=Status.PROVISIONING,
     )
+    billing_required = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

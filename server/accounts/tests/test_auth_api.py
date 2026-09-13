@@ -29,6 +29,7 @@ def test_user_can_signup_login_refresh_and_logout(client):
     tenant = Tenant.objects.get(slug="demo")
     assert tenant.name == "Demo Store"
     assert tenant.status == Tenant.Status.PROVISIONING
+    assert tenant.billing_required is True
     assert TenantOwner.objects.filter(user=user, tenant=tenant).exists()
     assert TenantHostname.objects.filter(
         tenant=tenant,

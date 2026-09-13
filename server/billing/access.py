@@ -17,6 +17,6 @@ def tenant_has_subscription_access(tenant: Tenant) -> bool:
 
 
 def tenant_has_billing_access(tenant: Tenant) -> bool:
-    return not settings.STRIPE_BILLING_ENFORCED or tenant_has_subscription_access(
-        tenant
-    )
+    if not settings.STRIPE_BILLING_ENFORCED and not tenant.billing_required:
+        return True
+    return tenant_has_subscription_access(tenant)

@@ -1,13 +1,14 @@
 from types import SimpleNamespace
 
 import pytest
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
 from billing.models import StripeWebhookEvent, TenantSubscription
 from billing.services import CheckoutRedirect, InvalidStripeWebhook, PortalRedirect
-from tenancy.models import Tenant, TenantOwner
+from tenancy.models import Tenant, TenantHostname, TenantOwner
 
 
 def authorization_for(user: User) -> dict[str, str]:
@@ -63,11 +64,37 @@ def test_tenant_owner_gets_default_subscription_status(client):
     assert response.json() == {
         "status": "not_started",
         "has_access": False,
+        "billing_required": False,
+        "trial_available": True,
         "can_manage": False,
         "trial_ends_at": None,
         "current_period_ends_at": None,
         "cancel_at_period_end": False,
     }
+
+
+@pytest.mark.django_db
+def test_subscription_status_reports_used_trial(client):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    tenant = Tenant.objects.create(slug="demo", name="Demo Store")
+    TenantOwner.objects.create(user=owner, tenant=tenant)
+    TenantSubscription.objects.create(
+        tenant=tenant,
+        status=TenantSubscription.Status.CANCELED,
+        trial_used=True,
+    )
+
+    response = client.get(
+        reverse("subscription-detail", kwargs={"tenant_slug": tenant.slug}),
+        headers=authorization_for(owner),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["trial_available"] is False
 
 
 @pytest.mark.django_db
@@ -148,6 +175,53 @@ def test_checkout_returns_service_unavailable_when_stripe_is_not_configured(clie
 
 
 @pytest.mark.django_db
+@override_settings(
+    STRIPE_PRICE_ID="price_test",
+    STRIPE_TRIAL_DAYS=14,
+    PLATFORM_FRONTEND_ORIGIN="http://localhost:3000",
+)
+def test_checkout_does_not_repeat_a_used_trial(client, monkeypatch):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    tenant = Tenant.objects.create(slug="demo", name="Demo Store")
+    TenantOwner.objects.create(user=owner, tenant=tenant)
+    TenantHostname.objects.create(tenant=tenant, hostname="demo.localhost")
+    TenantSubscription.objects.create(
+        tenant=tenant,
+        status=TenantSubscription.Status.CANCELED,
+        trial_used=True,
+    )
+    checkout_params = SimpleNamespace(value=None)
+
+    def create_session(params):
+        checkout_params.value = params
+        return SimpleNamespace(
+            id="cs_without_trial",
+            url="https://checkout.stripe.com/c/pay/test",
+        )
+
+    client_api = SimpleNamespace(
+        v1=SimpleNamespace(
+            checkout=SimpleNamespace(
+                sessions=SimpleNamespace(create=create_session),
+            )
+        )
+    )
+    monkeypatch.setattr("billing.services.stripe_client", lambda: client_api)
+
+    response = client.post(
+        reverse("subscription-checkout", kwargs={"tenant_slug": tenant.slug}),
+        headers=authorization_for(owner),
+    )
+
+    assert response.status_code == 200
+    assert "trial_period_days" not in checkout_params.value["subscription_data"]
+
+
+@pytest.mark.django_db
 def test_subscription_webhook_updates_billing_state_once(client, monkeypatch):
     tenant = Tenant.objects.create(slug="demo", name="Demo Store")
     event = {
@@ -192,6 +266,7 @@ def test_subscription_webhook_updates_billing_state_once(client, monkeypatch):
     assert subscription.current_period_ends_at is not None
     assert subscription.trial_ends_at.timestamp() == 1_800_000_000
     assert subscription.current_period_ends_at.timestamp() == 1_800_086_400
+    assert subscription.trial_used is True
     assert StripeWebhookEvent.objects.filter(id=event["id"]).count() == 1
 
 

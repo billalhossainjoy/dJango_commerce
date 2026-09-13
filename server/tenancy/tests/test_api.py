@@ -65,6 +65,27 @@ def test_tenant_context_requires_active_subscription(client):
 
 
 @pytest.mark.django_db
+def test_new_billing_required_tenant_requires_active_subscription(client):
+    tenant = Tenant.objects.create(
+        slug="new-store",
+        name="New Store",
+        status=Tenant.Status.ACTIVE,
+        billing_required=True,
+    )
+    url = reverse("tenant-context", kwargs={"tenant_slug": tenant.slug})
+
+    unavailable = client.get(url)
+    TenantSubscription.objects.create(
+        tenant=tenant,
+        status=TenantSubscription.Status.ACTIVE,
+    )
+    available = client.get(url)
+
+    assert unavailable.status_code == 404
+    assert available.status_code == 200
+
+
+@pytest.mark.django_db
 def test_owner_login_context_returns_minimal_inactive_tenant_identity(client):
     tenant = Tenant.objects.create(
         slug="demo",

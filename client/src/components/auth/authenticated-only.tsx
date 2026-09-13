@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { useSubscription } from "@/app/admin/billing/use-billing";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -17,6 +18,13 @@ export function AuthenticatedOnly({
   const router = useRouter();
   const status = useAuthStore((state) => state.status);
   const currentUser = useCurrentUser();
+  const ownerTenant = currentUser.data?.tenant;
+  const shouldCheckBilling = Boolean(
+    tenantSlug &&
+      ownerTenant?.status === "provisioning" &&
+      !pathname.startsWith("/admin/billing"),
+  );
+  const subscription = useSubscription(false, shouldCheckBilling);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -26,7 +34,6 @@ export function AuthenticatedOnly({
 
     if (status !== "authenticated" || !currentUser.data) return;
 
-    const ownerTenant = currentUser.data.tenant;
     if (tenantSlug && ownerTenant?.slug !== tenantSlug) {
       const hostname =
         ownerTenant?.canonical_hostname ??
@@ -37,8 +44,26 @@ export function AuthenticatedOnly({
 
     if (!tenantSlug && ownerTenant?.canonical_hostname) {
       redirectToHostname(ownerTenant.canonical_hostname, pathname);
+      return;
     }
-  }, [currentUser.data, pathname, router, status, tenantSlug]);
+
+    if (
+      shouldCheckBilling &&
+      subscription.data &&
+      !subscription.data.has_access
+    ) {
+      router.replace("/admin/billing?subscription=required");
+    }
+  }, [
+    currentUser.data,
+    ownerTenant,
+    pathname,
+    router,
+    shouldCheckBilling,
+    status,
+    subscription.data,
+    tenantSlug,
+  ]);
 
   if (status !== "authenticated") {
     return (
@@ -60,7 +85,6 @@ export function AuthenticatedOnly({
     return <AdminRouteStatus>Unable to verify store access.</AdminRouteStatus>;
   }
 
-  const ownerTenant = currentUser.data?.tenant;
   if (tenantSlug && ownerTenant?.slug !== tenantSlug) {
     return <AdminRouteStatus>Redirecting to your store…</AdminRouteStatus>;
   }
@@ -71,6 +95,14 @@ export function AuthenticatedOnly({
     ) : (
       <AdminRouteStatus>Store hostname is not configured.</AdminRouteStatus>
     );
+  }
+
+  if (shouldCheckBilling && subscription.isPending) {
+    return <AdminRouteStatus>Checking your subscription…</AdminRouteStatus>;
+  }
+
+  if (shouldCheckBilling && subscription.data && !subscription.data.has_access) {
+    return <AdminRouteStatus>Redirecting to billing…</AdminRouteStatus>;
   }
 
   return children;

@@ -14,6 +14,8 @@ export type SubscriptionStatus =
 export type Subscription = {
   status: SubscriptionStatus;
   has_access: boolean;
+  billing_required: boolean;
+  trial_available: boolean;
   can_manage: boolean;
   trial_ends_at: string | null;
   current_period_ends_at: string | null;
