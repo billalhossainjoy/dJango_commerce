@@ -6,6 +6,7 @@ from urllib.parse import urlsplit, urlunsplit
 import stripe
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from stripe.params.billing_portal import (
     SessionCreateParams as PortalSessionCreateParams,
 )
@@ -15,7 +16,11 @@ from stripe.params.checkout import (
 )
 
 from accounts.models import User
-from billing.models import StripeWebhookEvent, TenantSubscription
+from billing.models import (
+    StripeWebhookEvent,
+    SubscriptionPayment,
+    TenantSubscription,
+)
 from tenancy.models import Tenant, TenantHostname
 
 
@@ -189,6 +194,61 @@ def sync_subscription(data: dict[str, Any]) -> None:
     )
 
 
+def invoice_subscription_id(data: dict[str, Any]) -> str | None:
+    subscription_id = stripe_id(data.get("subscription"))
+    if subscription_id:
+        return subscription_id
+    return stripe_id(
+        data.get("parent", {}).get("subscription_details", {}).get("subscription")
+    )
+
+
+def sync_invoice_payment(data: dict[str, Any], *, paid: bool) -> None:
+    invoice_id = stripe_id(data.get("id"))
+    customer_id = stripe_id(data.get("customer"))
+    subscription_id = invoice_subscription_id(data)
+    currency = data.get("currency")
+    amount_due = data.get("amount_due")
+    amount_paid = data.get("amount_paid")
+    if (
+        not invoice_id
+        or not customer_id
+        or not isinstance(currency, str)
+        or not isinstance(amount_due, int)
+        or not isinstance(amount_paid, int)
+        or amount_due < 0
+        or amount_paid < 0
+    ):
+        return
+
+    subscription = TenantSubscription.objects.filter(
+        Q(stripe_customer_id=customer_id) | Q(stripe_subscription_id=subscription_id)
+    ).first()
+    if subscription is None:
+        return
+
+    paid_at = None
+    if paid:
+        paid_at = stripe_datetime(data.get("status_transitions", {}).get("paid_at"))
+    SubscriptionPayment.objects.update_or_create(
+        stripe_invoice_id=invoice_id,
+        defaults={
+            "tenant": subscription.tenant,
+            "stripe_customer_id": customer_id,
+            "stripe_subscription_id": subscription_id or "",
+            "status": (
+                SubscriptionPayment.Status.PAID
+                if paid
+                else SubscriptionPayment.Status.FAILED
+            ),
+            "currency": currency.lower(),
+            "amount_due_cents": amount_due,
+            "amount_paid_cents": amount_paid,
+            "paid_at": paid_at,
+        },
+    )
+
+
 @transaction.atomic
 def process_stripe_event(event: dict[str, Any]) -> bool:
     event_id = event.get("id")
@@ -217,6 +277,10 @@ def process_stripe_event(event: dict[str, Any]) -> bool:
         "customer.subscription.deleted",
     }:
         sync_subscription(data)
+    elif event_type == "invoice.paid":
+        sync_invoice_payment(data, paid=True)
+    elif event_type == "invoice.payment_failed":
+        sync_invoice_payment(data, paid=False)
     return True
 
 

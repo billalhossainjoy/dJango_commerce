@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from django.test import override_settings
@@ -6,7 +7,11 @@ from django.urls import reverse
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
-from billing.models import StripeWebhookEvent, TenantSubscription
+from billing.models import (
+    StripeWebhookEvent,
+    SubscriptionPayment,
+    TenantSubscription,
+)
 from billing.services import CheckoutRedirect, InvalidStripeWebhook, PortalRedirect
 from tenancy.models import Tenant, TenantHostname, TenantOwner
 
@@ -224,7 +229,7 @@ def test_checkout_does_not_repeat_a_used_trial(client, monkeypatch):
 @pytest.mark.django_db
 def test_subscription_webhook_updates_billing_state_once(client, monkeypatch):
     tenant = Tenant.objects.create(slug="demo", name="Demo Store")
-    event = {
+    event: dict[str, Any] = {
         "id": "evt_subscription_updated",
         "type": "customer.subscription.updated",
         "livemode": False,
@@ -301,6 +306,63 @@ def test_checkout_webhook_connects_stripe_ids_to_tenant(client, monkeypatch):
     assert subscription.stripe_checkout_session_id == "cs_123"
     assert subscription.stripe_customer_id == "cus_123"
     assert subscription.stripe_subscription_id == "sub_123"
+
+
+@pytest.mark.django_db
+def test_invoice_webhooks_record_latest_payment_result(client, monkeypatch):
+    tenant = Tenant.objects.create(slug="demo", name="Demo Store")
+    TenantSubscription.objects.create(
+        tenant=tenant,
+        stripe_customer_id="cus_123",
+        stripe_subscription_id="sub_123",
+        status=TenantSubscription.Status.ACTIVE,
+    )
+    event: dict[str, Any] = {
+        "id": "evt_invoice_failed",
+        "type": "invoice.payment_failed",
+        "livemode": False,
+        "data": {
+            "object": {
+                "id": "in_123",
+                "customer": "cus_123",
+                "subscription": "sub_123",
+                "currency": "usd",
+                "amount_due": 2500,
+                "amount_paid": 0,
+                "status_transitions": {"paid_at": None},
+            }
+        },
+    }
+    monkeypatch.setattr("billing.views.construct_stripe_event", lambda *_: event)
+    url = reverse("stripe-webhook")
+
+    failed = client.post(
+        url,
+        data=b"{}",
+        content_type="application/json",
+        headers={"stripe-signature": "test-signature"},
+    )
+    event["id"] = "evt_invoice_paid"
+    event["type"] = "invoice.paid"
+    event["data"]["object"]["amount_paid"] = 2500
+    event["data"]["object"]["status_transitions"]["paid_at"] = 1_800_000_000
+    paid = client.post(
+        url,
+        data=b"{}",
+        content_type="application/json",
+        headers={"stripe-signature": "test-signature"},
+    )
+
+    assert failed.status_code == 200
+    assert paid.status_code == 200
+    payment = SubscriptionPayment.objects.get(stripe_invoice_id="in_123")
+    assert payment.tenant == tenant
+    assert payment.status == SubscriptionPayment.Status.PAID
+    assert payment.currency == "usd"
+    assert payment.amount_due_cents == 2500
+    assert payment.amount_paid_cents == 2500
+    assert payment.paid_at is not None
+    assert payment.paid_at.timestamp() == 1_800_000_000
 
 
 @pytest.mark.django_db

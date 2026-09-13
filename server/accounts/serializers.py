@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
@@ -21,7 +22,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "email", "account_type", "tenant")
+        fields = ("id", "email", "account_type", "is_staff", "tenant")
 
     def get_tenant(self, user):
         ownership = user.tenant_ownerships.select_related("tenant").first()
@@ -131,11 +132,21 @@ def refresh_token_for(user: User) -> RefreshToken:
     return token
 
 
-def token_pair_for(user: User, *, include_account_type: bool = False):
+def token_pair_for(
+    user: User,
+    *,
+    include_account_type: bool = False,
+    include_is_staff: bool = False,
+) -> dict[str, Any]:
     refresh = refresh_token_for(user)
-    data = {"refresh": str(refresh), "access": str(refresh.access_token)}
+    data: dict[str, Any] = {
+        "refresh": str(refresh),
+        "access": str(refresh.access_token),
+    }
     if include_account_type:
         data["account_type"] = user.account_type
+    if include_is_staff:
+        data["is_staff"] = user.is_staff
     return data
 
 
@@ -237,7 +248,7 @@ class PlatformTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise invalid_credentials()
 
         assert user is not None
-        return token_pair_for(user)
+        return token_pair_for(user, include_is_staff=True)
 
 
 class SignupSerializer(serializers.ModelSerializer):

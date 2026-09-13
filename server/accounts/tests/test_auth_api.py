@@ -50,6 +50,7 @@ def test_user_can_signup_login_refresh_and_logout(client):
 
     assert login_response.status_code == 200
     assert login_response.json()["access"]
+    assert login_response.json()["is_staff"] is False
     assert "refresh" not in login_response.json()
     refresh_cookie = login_response.cookies["platform_refresh_token"]
     assert refresh_cookie["httponly"]
@@ -68,6 +69,25 @@ def test_user_can_signup_login_refresh_and_logout(client):
     rejected_refresh_response = client.post(reverse("token-refresh"))
 
     assert rejected_refresh_response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_platform_admin_login_returns_staff_role(client):
+    User.objects.create_superuser(
+        email="admin@example.com",
+        password="strong-test-password-123",
+    )
+
+    response = client.post(
+        reverse("auth-login"),
+        data={
+            "email": "admin@example.com",
+            "password": "strong-test-password-123",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_staff"] is True
 
 
 @pytest.mark.django_db
@@ -191,6 +211,7 @@ def test_current_user_returns_owned_tenant(client):
         "id": str(user.id),
         "email": "owner@example.com",
         "account_type": User.AccountType.PLATFORM,
+        "is_staff": False,
         "tenant": {
             "id": str(tenant.id),
             "slug": "demo",

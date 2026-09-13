@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "customers",
     "orders",
     "billing",
+    "platform_admin",
 ]
 
 MIDDLEWARE = [

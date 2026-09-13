@@ -34,6 +34,11 @@ export function AuthenticatedOnly({
 
     if (status !== "authenticated" || !currentUser.data) return;
 
+    if (currentUser.data.is_staff) {
+      router.replace("/platform-admin");
+      return;
+    }
+
     if (tenantSlug && ownerTenant?.slug !== tenantSlug) {
       const hostname =
         ownerTenant?.canonical_hostname ??
@@ -83,6 +88,10 @@ export function AuthenticatedOnly({
 
   if (currentUser.isError) {
     return <AdminRouteStatus>Unable to verify store access.</AdminRouteStatus>;
+  }
+
+  if (currentUser.data?.is_staff) {
+    return <AdminRouteStatus>Redirecting to platform administration…</AdminRouteStatus>;
   }
 
   if (tenantSlug && ownerTenant?.slug !== tenantSlug) {

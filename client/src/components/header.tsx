@@ -7,12 +7,14 @@ import { useCart } from "@/app/(site)/cart/use-cart";
 import { useAuth } from "@/hooks/use-auth";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { useCurrentCustomer } from "@/hooks/use-current-customer";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useTenantQuery } from "@/hooks/use-tenant-query";
 
 export function Header({ tenantSlug }: { tenantSlug: string | null }) {
   const platformAuth = useAuth();
   const customerAuth = useCustomerAuth(tenantSlug ?? "");
   const customer = useCurrentCustomer(tenantSlug ?? "");
+  const platformUser = useCurrentUser();
   const tenant = useTenantQuery(tenantSlug);
   const isTenant = tenantSlug !== null;
   const cart = useCart(tenantSlug ?? "");
@@ -21,6 +23,9 @@ export function Header({ tenantSlug }: { tenantSlug: string | null }) {
   const email = customer.data?.email;
   const customerLabel = customerName || email;
   const logout = isTenant ? customerAuth.logout : platformAuth.logout;
+  const platformDashboardHref = platformUser.data?.is_staff
+    ? "/platform-admin"
+    : "/admin";
 
   return (
     <header className="border-b border-zinc-200 bg-white text-zinc-950">
@@ -104,7 +109,7 @@ export function Header({ tenantSlug }: { tenantSlug: string | null }) {
                   <DropdownMenu.Item asChild>
                     <Link
                       className="flex cursor-pointer rounded-lg px-2 py-2 text-sm outline-none hover:bg-zinc-100 focus:bg-zinc-100"
-                      href={isTenant ? "/account" : "/admin"}
+                      href={isTenant ? "/account" : platformDashboardHref}
                     >
                       {isTenant ? "Account" : "Store dashboard"}
                     </Link>

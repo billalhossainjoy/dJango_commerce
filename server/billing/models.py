@@ -64,3 +64,28 @@ class StripeWebhookEvent(models.Model):
 
     def __str__(self) -> str:
         return self.id
+
+
+class SubscriptionPayment(models.Model):
+    class Status(models.TextChoices):
+        PAID = "paid", "Paid"
+        FAILED = "failed", "Failed"
+
+    tenant = models.ForeignKey(
+        "tenancy.Tenant",
+        on_delete=models.PROTECT,
+        related_name="subscription_payments",
+    )
+    stripe_invoice_id = models.CharField(max_length=255, unique=True)
+    stripe_customer_id = models.CharField(max_length=255)
+    stripe_subscription_id = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=Status)
+    currency = models.CharField(max_length=3)
+    amount_due_cents = models.PositiveBigIntegerField(default=0)
+    amount_paid_cents = models.PositiveBigIntegerField(default=0)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.stripe_invoice_id

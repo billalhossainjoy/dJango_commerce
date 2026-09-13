@@ -8,6 +8,7 @@ import {
   type LoginInput,
   type SignupInput,
 } from "@/app/app.service";
+import { currentUserQueryKey } from "@/hooks/use-current-user";
 import { authSessionQueryKey, useAuthStore } from "@/stores/auth-store";
 
 const appService = new AppService();
@@ -22,6 +23,7 @@ export function useAuth() {
   const login = useMutation({
     mutationFn: (input: LoginInput) => appService.login(input),
     onSuccess: ({ access }) => {
+      queryClient.removeQueries({ queryKey: currentUserQueryKey });
       queryClient.setQueryData<AuthTokens>(authSessionQueryKey, { access });
       setAuthenticated(access);
     },
@@ -30,6 +32,7 @@ export function useAuth() {
     mutationFn: () => appService.logout(),
     onSettled: () => {
       queryClient.setQueryData<AuthTokens | null>(authSessionQueryKey, null);
+      queryClient.removeQueries({ queryKey: currentUserQueryKey });
       setUnauthenticated();
     },
   });

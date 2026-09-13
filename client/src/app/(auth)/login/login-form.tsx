@@ -46,8 +46,8 @@ export function LoginForm({
           result.account_type === "platform" ? "/admin" : "/account",
         );
       } else {
-        await platformAuth.login({ email, password });
-        router.replace("/admin");
+        const result = await platformAuth.login({ email, password });
+        router.replace(result.is_staff ? "/platform-admin" : "/admin");
       }
     } catch (error) {
       setError("root", {

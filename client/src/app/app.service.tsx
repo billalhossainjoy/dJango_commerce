@@ -18,12 +18,14 @@ export type TenantLoginContext = {
 
 export type AuthTokens = {
   access: string;
+  is_staff?: boolean;
 };
 
 export type CurrentUser = {
   id: string;
   email: string;
   account_type: "platform" | "customer";
+  is_staff: boolean;
   tenant: OwnedTenantContext | null;
 };
 
