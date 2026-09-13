@@ -34,6 +34,23 @@ export function Header({ tenantSlug }: { tenantSlug: string | null }) {
           {isTenant ? tenant.data?.name ?? tenantSlug : "E-commerce"}
         </Link>
 
+        {!isTenant ? (
+          <nav
+            className="hidden items-center gap-7 text-sm font-medium text-zinc-600 md:flex"
+            aria-label="Marketing navigation"
+          >
+            <Link className="transition hover:text-zinc-950" href="/#features">
+              Features
+            </Link>
+            <Link
+              className="transition hover:text-zinc-950"
+              href="/#how-it-works"
+            >
+              How it works
+            </Link>
+          </nav>
+        ) : null}
+
         <nav className="flex items-center gap-4" aria-label="Account navigation">
           {isTenant ? (
             <Link
