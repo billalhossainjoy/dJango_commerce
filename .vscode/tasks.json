@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend: run server",
+      "type": "shell",
+      "command": "uv run --project server python server/manage.py runserver 0.0.0.0:8000",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: test",
+      "type": "shell",
+      "command": "env -u DATABASE_URL DJANGO_ENVIRONMENT=test uv run --project server pytest server/tests",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: type check",
+      "type": "shell",
+      "command": "env -u DATABASE_URL DJANGO_ENVIRONMENT=test uv run --project server mypy --config-file server/pyproject.toml server",
+      "group": "test",
+      "problemMatcher": ["$mypy"]
+    },
+    {
+      "label": "Backend: Django check",
+      "type": "shell",
+      "command": "uv run --project server python server/manage.py check",
+      "problemMatcher": []
+    }
+  ]
+}

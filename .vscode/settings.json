@@ -1,0 +1,28 @@
+{
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    },
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  },
+  "mypy-type-checker.args": [
+    "--config-file=${workspaceFolder}/server/pyproject.toml"
+  ],
+  "mypy-type-checker.cwd": "${workspaceFolder}",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/server"
+  ],
+  "python.analysis.typeCheckingMode": "basic",
+  "python.terminal.activateEnvironment": false,
+  "python.envFile": "${workspaceFolder}/.env.test",
+  "python.testing.pytestArgs": [
+    "server/tests"
+  ],
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "ruff.configuration": "${workspaceFolder}/server/pyproject.toml"
+}
