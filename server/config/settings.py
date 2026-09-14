@@ -24,7 +24,11 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
     CORS_ALLOWED_ORIGIN_REGEXES=(list, []),
+    CSRF_TRUSTED_ORIGINS=(list, []),
     DATABASE_CONN_MAX_AGE=(int, 0),
+    SMTP_PORT=(int, 587),
+    SMTP_USE_TLS=(bool, True),
+    SECURE_HSTS_SECONDS=(int, 3600),
 )
 
 # Runtime variables win over local secrets, and local secrets win over the
@@ -82,6 +86,9 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+if ENVIRONMENT == "production":
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 ROOT_URLCONF = "config.urls"
 
@@ -147,7 +154,27 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+
+# Railway terminates TLS before forwarding requests to Django.
+if ENVIRONMENT == "production":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/$", r"^api/v1/readiness/$"]
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+    SECURE_HSTS_SECONDS = env("SECURE_HSTS_SECONDS")
 
 
 # Product media
@@ -173,11 +200,28 @@ PLATFORM_FRONTEND_ORIGIN = env.str(
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
-    },
-}
+if ENVIRONMENT == "production":
+    MAILERS = {
+        "default": {
+            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+            "OPTIONS": {
+                "host": env.str("SMTP_HOST", default="localhost"),
+                "port": env("SMTP_PORT"),
+                "username": env.str("SMTP_USERNAME", default=""),
+                "password": env.str("SMTP_PASSWORD", default=""),
+                "use_tls": env("SMTP_USE_TLS"),
+                "timeout": 10,
+            },
+        },
+    }
+else:
+    MAILERS = {
+        "default": {
+            "BACKEND": "django.core.mail.backends.console.EmailBackend",
+        },
+    }
+
+DEFAULT_FROM_EMAIL = env.str("DEFAULT_FROM_EMAIL", default="noreply@localhost")
 
 
 AUTH_USER_MODEL = "accounts.User"

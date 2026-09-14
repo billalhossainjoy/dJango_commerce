@@ -25,7 +25,6 @@ order features have not been implemented yet.
 ```text
 client/   Next.js storefront and administration UI
 server/   Django API and business logic
-docs/     Optional local documentation; the private plan is not committed
 ```
 
 ## Development environment
@@ -109,7 +108,40 @@ To test production configuration locally after creating `.env.production`:
 DJANGO_ENVIRONMENT=production uv run --project server python server/manage.py check --deploy
 ```
 
-This setup does not yet include a production image or deployment workflow.
+## Railway deployment
+
+The Django service uses `/server` as its root directory, Railpack with Python
+3.14 (pinned in `server/.python-version`), and these service settings:
+
+- Pre-deploy command: `python manage.py migrate --noinput`
+- Start command: `sh start.sh`
+- Healthcheck: `/api/v1/readiness/` with a 120-second timeout
+- Port: `8080`
+
+Import production secrets into Railway variables, including
+`DJANGO_ENVIRONMENT=production`. Include the API hostname and
+`healthcheck.railway.app` in `ALLOWED_HOSTS`. The startup script collects static
+files and starts Gunicorn; WhiteNoise serves Django's static assets.
+
+The Next.js service uses `/client` as its root directory. Set `DJANGO_API_URL`
+to the HTTPS backend origin and `NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN` to the public
+platform domain. Rebuild the client after changing either variable because
+Next.js embeds the API rewrite and public configuration during its build.
+
+For the trial plan's single custom domain, use `*.stockfare.app` on the client
+service. Keep `NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN=stockfare.app` for tenant URLs,
+set `NEXT_PUBLIC_PLATFORM_HOSTNAME=www.stockfare.app` for platform redirects,
+and set the server's `PLATFORM_FRONTEND_ORIGIN=https://www.stockfare.app`.
+In Cloudflare, configure the wildcard CNAME and the DNS-only `_acme-challenge`
+CNAME supplied by Railway. Keep Railway's ownership verification TXT record.
+The apex `stockfare.app` requires a Cloudflare redirect to `www.stockfare.app`;
+the wildcard does not cover the apex. Preserve the request path and query string
+and keep the apex DNS record proxied so Cloudflare can perform that redirect.
+
+Deploy local server changes with `railway up --service dJango_commerce` from the
+repository root. Verify both `/api/v1/health/` and `/api/v1/readiness/` through
+the public frontend after deployment. Keep the deployment files in the GitHub
+branch used by Railway before relying on subsequent GitHub autodeploys.
 
 ## Commit messages
 

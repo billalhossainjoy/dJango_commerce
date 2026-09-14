@@ -34,7 +34,9 @@ const signupSchema = z
 type SignupValues = z.infer<typeof signupSchema>;
 
 function getPlatformLoginUrl(): string {
-  const rootDomain = process.env.NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN;
+  const rootDomain =
+    process.env.NEXT_PUBLIC_PLATFORM_HOSTNAME ??
+    process.env.NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN;
   if (!rootDomain) {
     throw new Error("The platform root domain is not configured.");
   }

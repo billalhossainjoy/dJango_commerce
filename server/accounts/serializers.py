@@ -114,7 +114,7 @@ class CustomerPasswordSerializer(serializers.Serializer):
         validate_password(value, self.context["user"])
         return value
 
-    def save(self) -> User:
+    def save(self, **kwargs: Any) -> User:
         user = self.context["user"]
         user.set_password(self.validated_data["new_password"])
         user.save(update_fields=["password"])
