@@ -200,7 +200,20 @@ PLATFORM_FRONTEND_ORIGIN = env.str(
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-if ENVIRONMENT == "production":
+if (
+    ENVIRONMENT == "production"
+    and env.str("EMAIL_TRANSPORT", default="smtp") == "resend"
+):
+    MAILERS = {
+        "default": {
+            "BACKEND": "accounts.emails.backend.ResendEmailBackend",
+            "OPTIONS": {
+                "api_key": env.str("RESEND_API_KEY"),
+                "timeout": 10,
+            },
+        },
+    }
+elif ENVIRONMENT == "production":
     MAILERS = {
         "default": {
             "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
@@ -246,11 +259,14 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
+    "CHECK_REVOKE_TOKEN": True,
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
 }
+
+PASSWORD_RESET_TIMEOUT = 60 * 60
 
 JWT_PLATFORM_REFRESH_COOKIE_NAME = "platform_refresh_token"
 JWT_CUSTOMER_REFRESH_COOKIE_NAME = "customer_refresh_token"

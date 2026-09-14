@@ -12,12 +12,9 @@ class IsPlatformUser(BasePermission):
         return user.account_type == User.AccountType.PLATFORM
 
 
-class IsPlatformAdmin(BasePermission):
+class IsPlatformAdmin(IsPlatformUser):
     def has_permission(self, request: Request, view) -> bool:
-        if not request.user.is_authenticated:
-            return False
-        user = request.user
-        return bool(user.account_type == User.AccountType.PLATFORM and user.is_staff)
+        return super().has_permission(request, view) and request.user.is_staff
 
 
 class IsCustomerForTenant(BasePermission):

@@ -83,11 +83,19 @@ export function LoginForm({
 
           <FieldError>{errors.root?.message}</FieldError>
 
+          <Link href="/forgot-password" className="text-sm font-medium text-primary underline underline-offset-4">
+            Forgot your password?
+          </Link>
+
           <Button className="w-full" type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Logging in…" : "Log in"}
           </Button>
         </FieldGroup>
       </form>
+
+      <p className="mt-4 text-center text-sm">
+        <Link href="/verify-email" className="text-muted-foreground underline underline-offset-4">Resend verification email</Link>
+      </p>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Need an account?{" "}

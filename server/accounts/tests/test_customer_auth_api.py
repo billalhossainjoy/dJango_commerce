@@ -3,8 +3,11 @@ import logging
 import pytest
 from django.core.cache import cache
 from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework_simplejwt.tokens import AccessToken
 
+from accounts.emails.actions import verification_tokens
 from accounts.models import User
 from tenancy.models import Tenant, TenantOwner
 
@@ -45,6 +48,15 @@ def test_customer_can_signup_login_refresh_get_current_user_and_logout(
     customer = User.objects.get(email="buyer@example.com")
     assert customer.account_type == User.AccountType.CUSTOMER
     assert customer.tenant == active_tenant
+
+    verified = client.post(
+        customer_url("customer-verify-email", active_tenant),
+        data={
+            "uid": urlsafe_base64_encode(force_bytes(customer.pk)),
+            "token": verification_tokens.make_token(customer),
+        },
+    )
+    assert verified.status_code == 200
 
     login_response = client.post(
         customer_url("customer-auth-login", active_tenant),

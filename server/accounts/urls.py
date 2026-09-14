@@ -1,6 +1,7 @@
 from django.urls import path
 
-from accounts.views import (
+from accounts.email_urls import email_urlpatterns
+from accounts.views.platform import (
     CurrentUserView,
     LoginView,
     LogoutView,
@@ -8,7 +9,7 @@ from accounts.views import (
     SignupView,
 )
 
-urlpatterns = [
+urlpatterns = email_urlpatterns("auth") + [
     path("signup/", SignupView.as_view(), name="auth-signup"),
     path("login/", LoginView.as_view(), name="auth-login"),
     path("me/", CurrentUserView.as_view(), name="auth-me"),

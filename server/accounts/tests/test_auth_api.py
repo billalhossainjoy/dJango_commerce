@@ -1,7 +1,10 @@
 import pytest
 from django.test import override_settings
 from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 
+from accounts.emails.actions import verification_tokens
 from accounts.models import User
 from tenancy.models import Tenant, TenantHostname, TenantOwner
 
@@ -42,6 +45,15 @@ def test_user_can_signup_login_refresh_and_logout(client):
         "status": Tenant.Status.PROVISIONING,
         "canonical_hostname": "demo.localhost",
     }
+
+    verified = client.post(
+        reverse("auth-verify-email"),
+        data={
+            "uid": urlsafe_base64_encode(force_bytes(user.pk)),
+            "token": verification_tokens.make_token(user),
+        },
+    )
+    assert verified.status_code == 200
 
     login_response = client.post(
         reverse("auth-login"),

@@ -143,6 +143,46 @@ repository root. Verify both `/api/v1/health/` and `/api/v1/readiness/` through
 the public frontend after deployment. Keep the deployment files in the GitHub
 branch used by Railway before relying on subsequent GitHub autodeploys.
 
+## Transactional email
+
+Production uses Resend HTTPS through Django's default `MAILERS` backend. Set
+`EMAIL_TRANSPORT=resend`, `RESEND_API_KEY`, and `DEFAULT_FROM_EMAIL` to a sender
+on your verified Resend domain. This works on Railway plans that block SMTP.
+Alternatively, use `EMAIL_TRANSPORT=smtp`, `SMTP_HOST=smtp.resend.com`,
+`SMTP_PORT=587`, `SMTP_USE_TLS=true`, `SMTP_USERNAME=resend`, and `SMTP_PASSWORD`
+set to the Resend API key. Development prints messages to the console; tests
+use an in-memory mailer.
+
+- Public owner and customer signup sends a verification email. New accounts
+  must verify before signing in; existing and administrator-created accounts
+  remain accessible. Verification is recorded in `email_verified_at`.
+- `/verify-email` confirms the link or lets users request another email.
+- `/forgot-password` requests a reset; `/reset-password` accepts a new password.
+  Links expire after one hour and cannot be reused. Recovery stays within the
+  selected platform/store account scope. Password changes invalidate existing
+  JWT sessions; users may need to sign in again after this feature is deployed.
+- Checkout queues one confirmation per saved order, including items, shipping,
+  the authoritative total, and cash-on-delivery instructions. Guest orders are
+  supported. Repeating an idempotent checkout does not queue another email.
+
+Emails are saved to `accounts.OutboundEmail` in the same transaction as the
+account/order and sent after commit. Delivery failures do not roll back the account
+or order. The Django admin displays delivery status without exposing message
+content or reset links. Successful messages have their stored bodies cleared.
+
+Retry due unsent messages with:
+
+```bash
+python manage.py send_pending_emails --limit 100
+```
+
+Run this command on a scheduled worker for unattended retries. A retry schedule
+is not created automatically. Retries use exponential backoff up to one hour;
+expired verification/reset messages are skipped. Resend requests use a stable
+idempotency key to prevent duplicate acceptance within its 24-hour window.
+SMTP, or retries outside that window, cannot guarantee exactly once delivery
+if a process stops after acceptance but before recording success.
+
 ## Commit messages
 
 The repository uses [Conventional Commits](https://www.conventionalcommits.org/)

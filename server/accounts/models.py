@@ -27,6 +27,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     account_type = models.CharField(max_length=20, choices=AccountType)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
+    # Existing and administrator-created accounts keep access; public signup opts in.
+    email_verification_required = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 
     objects: UserManager = UserManager()
@@ -58,3 +61,21 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class OutboundEmail(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    deduplication_key = models.CharField(max_length=200, unique=True)
+    recipient = models.EmailField()
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    html_body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveIntegerField(default=0)
+    next_attempt_at = models.DateTimeField()
+    last_error = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["sent_at", "next_attempt_at"])]

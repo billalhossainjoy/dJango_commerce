@@ -8,6 +8,7 @@ from rest_framework.request import Request
 
 from accounts.models import User
 from catalog.models import Product, ProductImage
+from orders.emails import queue_order_confirmation
 from orders.models import Cart, CartItem, Order, OrderItem
 from tenancy.models import Tenant
 
@@ -124,6 +125,7 @@ def create_order_from_cart(
         product.save(update_fields=["stock_quantity", "updated_at"])
 
     cart.delete()
+    queue_order_confirmation(order)
     return order
 
 

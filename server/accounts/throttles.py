@@ -16,3 +16,14 @@ class TenantLoginThrottle(TenantIPThrottle):
 
 class CustomerSignupThrottle(TenantIPThrottle):
     scope = "customer_signup"
+
+
+class EmailActionThrottle(SimpleRateThrottle):
+    scope = "email_action"
+    rate = "10/hour"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": self.get_ident(request),
+        }
