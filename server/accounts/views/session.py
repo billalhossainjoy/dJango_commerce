@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from accounts.models import User
 
@@ -37,6 +38,14 @@ def move_refresh_to_cookie(response, account_type=User.AccountType.PLATFORM):
             samesite="Lax",
         )
     return response
+
+
+class RefreshCookieLoginView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        return move_refresh_to_cookie(
+            response, response.data.get("account_type", User.AccountType.PLATFORM)
+        )
 
 
 class RefreshCookieLogoutView(APIView):

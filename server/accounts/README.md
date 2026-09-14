@@ -14,7 +14,8 @@ are registered in `urls.py` (platform) and `customer_urls.py` (store customers).
 | `serializers/authentication.py` | Platform and tenant login validation |
 | `serializers/email.py` | Verification and password-reset request validation |
 | `views/platform.py`, `views/customer.py` | Account API endpoints |
-| `views/session.py` | Shared refresh-cookie and logout handling |
+| `views/session.py` | Shared login, refresh-cookie configuration, and logout handling |
+| `email_urls.py` | Verification and password-reset routes shared by both account types |
 | `views/email.py` | Verification and password-reset endpoints |
 | `emails/actions.py` | Single-use account links and email composition |
 | `emails/delivery.py` | Transactional outbox, delivery attempts, and retries |
@@ -27,6 +28,27 @@ The `views` and `serializers` packages export their public endpoint and serializ
 classes. Shared session helpers live in `views.session`; JWT helpers live in
 `tokens`. Other apps queue messages through `accounts.emails.delivery.queue_email`.
 Production's Resend backend path is `accounts.emails.backend.ResendEmailBackend`.
+
+## Review and simplification
+
+| Files reviewed | Result |
+| --- | --- |
+| `models.py`, migrations | Kept the identity constraints, verification fields, and outbox schema intact. |
+| `managers.py` | Removed an override that only called Django's existing email normalization. |
+| `backends.py`, `serializers/authentication.py` | Reused Django's password-hashing helper. Platform login now performs hashing for unknown and inactive accounts, too. Kept tenant-owner matching and ambiguous-login rejection. |
+| `permissions.py` | Reused the platform-user permission when checking platform administrators. |
+| `throttles.py` | Kept the separate tenant and email rate limits. |
+| `tokens.py` | Kept tenant claims, verification requirements, and password-change revocation. |
+| `selectors.py` | Kept tenant availability and account-scope checks. |
+| `serializers/platform.py`, `serializers/customer.py` | Used field validators for signup passwords and reused the owner-tenant response serializer. Kept signup transactions and email-change verification. |
+| `serializers/email.py`, `views/email.py` | Kept single-use token validation and generic recovery responses. Combined link-user lookup and row locking into one database query. |
+| `views/platform.py`, `views/customer.py`, `views/session.py` | Centralized cookie settings and login response handling. Login, refresh, and logout use the same cookie scope. |
+| `urls.py`, `customer_urls.py`, `email_urls.py` | Defined email routes once while preserving their existing paths and names. |
+| `emails/actions.py` | Kept account-specific links, expiry, and resend cooldowns. |
+| `emails/delivery.py`, retry command | Kept transactional delivery, retry backoff, deduplication, and removal of sent message bodies. |
+| `emails/backend.py`, email template | Kept provider idempotency, header validation, HTML escaping, and delivery error handling. |
+| `admin.py`, app configuration, package exports | Kept admin fields and public imports stable. |
+| `tests/` | Added regression coverage for failed-login hashing and signup password validation; extended cookie coverage through refresh and logout. |
 
 Run account tests from the repository root:
 

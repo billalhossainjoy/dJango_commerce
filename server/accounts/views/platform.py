@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.models import User
 from accounts.permissions import IsPlatformUser
@@ -20,6 +20,7 @@ from accounts.serializers import (
 from accounts.throttles import CustomerSignupThrottle
 from accounts.tokens import refresh_allowed
 from accounts.views.session import (
+    RefreshCookieLoginView,
     RefreshCookieLogoutView,
     move_refresh_to_cookie,
 )
@@ -44,14 +45,8 @@ class CurrentUserView(APIView):
         return Response(serializer.data)
 
 
-class LoginView(TokenObtainPairView):
+class LoginView(RefreshCookieLoginView):
     serializer_class = PlatformTokenObtainPairSerializer
-
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        return move_refresh_to_cookie(
-            response, response.data.get("account_type", User.AccountType.PLATFORM)
-        )
 
 
 class RefreshView(TokenRefreshView):

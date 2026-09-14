@@ -1,4 +1,5 @@
 import pytest
+from django.contrib.auth.hashers import get_hasher
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.encoding import force_bytes
@@ -159,6 +160,7 @@ def test_platform_refresh_cookie_uses_configured_shared_domain(client):
             "password": "strong-test-password-123",
         },
     )
+    refresh_response = client.post(reverse("token-refresh"))
     logout_response = client.post(reverse("auth-logout"))
 
     assert login_response.cookies["platform_refresh_token"]["domain"] == (
@@ -167,6 +169,65 @@ def test_platform_refresh_cookie_uses_configured_shared_domain(client):
     assert logout_response.cookies["platform_refresh_token"]["domain"] == (
         ".example.com"
     )
+    assert refresh_response.status_code == 200
+    assert "refresh" not in refresh_response.json()
+    for response in (login_response, refresh_response, logout_response):
+        cookie = response.cookies["platform_refresh_token"]
+        assert cookie["domain"] == ".example.com"
+        assert cookie["path"] == "/api/v1/auth/"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("active", [None, False, True])
+def test_failed_platform_login_always_runs_password_hashing(
+    client, monkeypatch, active
+):
+    if active is not None:
+        User.objects.create_user(
+            email="owner@example.com",
+            password="correct-password-123",
+            account_type=User.AccountType.PLATFORM,
+            is_active=active,
+        )
+    hasher = type(get_hasher())
+    encode = hasher.encode
+    calls = []
+
+    def counted_encode(*args, **kwargs):
+        calls.append(True)
+        return encode(*args, **kwargs)
+
+    monkeypatch.setattr(hasher, "encode", counted_encode)
+    response = client.post(
+        reverse("auth-login"),
+        data={"email": "owner@example.com", "password": "wrong-password-123"},
+    )
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid email or password.",
+        "code": "no_active_account",
+    }
+    assert len(calls) == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("customer", [False, True])
+def test_signup_rejects_weak_password_without_creating_account(client, customer):
+    data = {
+        "email": "new@example.com",
+        "password": "123",
+        "store_name": "New",
+        "slug": "new",
+    }
+    if customer:
+        tenant = Tenant.objects.create(slug="store", status=Tenant.Status.ACTIVE)
+        url = reverse("customer-auth-signup", kwargs={"tenant_slug": tenant.slug})
+    else:
+        url = reverse("auth-signup")
+    response = client.post(url, data=data)
+    assert response.status_code == 400
+    assert "password" in response.json()
+    assert not User.objects.filter(email=data["email"]).exists()
 
 
 @pytest.mark.django_db

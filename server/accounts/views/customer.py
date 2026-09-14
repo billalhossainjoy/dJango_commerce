@@ -21,8 +21,8 @@ from accounts.serializers import (
 )
 from accounts.throttles import CustomerSignupThrottle, TenantLoginThrottle
 from accounts.tokens import refresh_allowed, refresh_token_for
-from accounts.views.platform import LoginView
 from accounts.views.session import (
+    RefreshCookieLoginView,
     RefreshCookieLogoutView,
     move_refresh_to_cookie,
 )
@@ -44,7 +44,7 @@ class CustomerSignupView(APIView):
         return Response(CustomerSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
-class TenantLoginView(LoginView):
+class TenantLoginView(RefreshCookieLoginView):
     serializer_class = TenantTokenObtainPairSerializer
     throttle_classes = [TenantLoginThrottle]
 

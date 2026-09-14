@@ -95,8 +95,11 @@ class PlatformTokenObtainPairSerializer(TokenObtainPairSerializer):
             email__iexact=email,
             account_type=User.AccountType.PLATFORM,
         ).first()
-        if not password_matches(user, attrs["password"]) or not user.is_active:
+        if (
+            not password_matches(user, attrs["password"])
+            or user is None
+            or not user.is_active
+        ):
             raise invalid_credentials()
 
-        assert user is not None
         return token_pair_for(user, include_is_staff=True)
