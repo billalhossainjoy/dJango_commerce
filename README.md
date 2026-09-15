@@ -156,7 +156,9 @@ use an in-memory mailer.
 - Public owner and customer signup sends a verification email. New accounts
   must verify before signing in; existing and administrator-created accounts
   remain accessible. Verification is recorded in `email_verified_at`.
-- `/verify-email` confirms the link or lets users request another email.
+- `/verify-email` confirms the emailed link. Without a link, it shows inbox
+  instructions; verification emails are sent automatically at signup, with no
+  resend controls in the application.
 - `/forgot-password` requests a reset; `/reset-password` accepts a new password.
   Links expire after one hour and cannot be reused. Recovery stays within the
   selected platform/store account scope. Password changes invalidate existing

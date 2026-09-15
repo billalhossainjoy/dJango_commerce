@@ -79,7 +79,7 @@ class VerifyEmailView(EmailActionView):
             ):
                 return Response(
                     {
-                        "detail": "This verification link is invalid or has expired. Request a new email."
+                        "detail": "This verification link is invalid or has expired."
                     },
                     status=400,
                 )

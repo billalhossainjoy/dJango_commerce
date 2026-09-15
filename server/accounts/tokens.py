@@ -26,7 +26,7 @@ def token_pair_for(
 ) -> dict[str, Any]:
     if user.email_verification_required and user.email_verified_at is None:
         raise AuthenticationFailed(
-            "Verify your email address before signing in. You can request a new verification email below.",
+            "Verify your email address before signing in. Check the verification email sent when you signed up.",
             "email_verification_required",
         )
     refresh = refresh_token_for(user)

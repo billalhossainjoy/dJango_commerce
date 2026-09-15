@@ -35,13 +35,11 @@ export function AccountEmailForm({
           ? "password/reset/"
           : mode === "reset"
             ? "password/reset/confirm/"
-            : hasLink
-              ? "email/verify/"
-              : "email/verification/";
+            : "email/verify/";
       const body =
         mode === "reset"
           ? { uid, token, new_password: password }
-          : mode === "verify" && hasLink
+          : mode === "verify"
             ? { uid, token }
             : { email };
       return apiRequest<{ detail: string }>(`${base}${path}`, {
@@ -72,7 +70,7 @@ export function AccountEmailForm({
         ? "Use a strong password that you don’t use for other accounts."
         : hasLink
           ? "Confirm your email address to finish setting up your account."
-          : "We’ve requested a verification email for your new account. Check your inbox and spam folder. Need another link? Enter your email below.";
+          : "A verification email is sent automatically when you sign up. Check your inbox and spam folder, then open the link to verify your account.";
   const invalidReset = mode === "reset" && !hasLink;
   return (
     <div>
@@ -96,6 +94,10 @@ export function AccountEmailForm({
         <p className="mt-4 text-sm text-destructive" role="alert">
           This reset link is incomplete. Request a new one below.
         </p>
+      ) : mode === "verify" && !hasLink ? (
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          {description}
+        </p>
       ) : (
         <>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -113,7 +115,7 @@ export function AccountEmailForm({
               mutation.mutate();
             }}
           >
-            {mode === "forgot" || (mode === "verify" && !hasLink) ? (
+            {mode === "forgot" ? (
               <div>
                 <label htmlFor="recovery-email" className="text-sm font-medium">
                   Email address
@@ -192,9 +194,7 @@ export function AccountEmailForm({
                   ? "Send reset link"
                   : mode === "reset"
                     ? "Reset password"
-                    : hasLink
-                      ? "Verify email address"
-                      : "Resend verification email"}
+                    : "Verify email address"}
             </Button>
           </form>
         </>
@@ -213,21 +213,6 @@ export function AccountEmailForm({
             className="block text-muted-foreground underline underline-offset-4"
           >
             Request a new reset link
-          </Link>
-        ) : mode === "verify" && hasLink ? (
-          <Link
-            href="/verify-email"
-            className="block text-muted-foreground underline underline-offset-4"
-          >
-            Request a new verification link
-          </Link>
-        ) : null}
-        {mode === "reset" && completed ? (
-          <Link
-            href="/verify-email"
-            className="block text-muted-foreground underline underline-offset-4"
-          >
-            Still need to verify your email?
           </Link>
         ) : null}
       </div>

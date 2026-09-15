@@ -93,10 +93,6 @@ export function LoginForm({
         </FieldGroup>
       </form>
 
-      <p className="mt-4 text-center text-sm">
-        <Link href="/verify-email" className="text-muted-foreground underline underline-offset-4">Resend verification email</Link>
-      </p>
-
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Need an account?{" "}
         <Link
