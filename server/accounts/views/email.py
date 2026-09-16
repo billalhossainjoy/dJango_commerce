@@ -78,9 +78,7 @@ class VerifyEmailView(EmailActionView):
                 )
             ):
                 return Response(
-                    {
-                        "detail": "This verification link is invalid or has expired."
-                    },
+                    {"detail": "This verification link is invalid or has expired."},
                     status=400,
                 )
             user.email_verified_at = timezone.now()
