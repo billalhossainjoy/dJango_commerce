@@ -4,11 +4,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { AppService, type CurrentUser } from "@/app/app.service";
+import { OverviewPanel } from "@/app/admin/overview-panel";
 import { Button } from "@/components/ui/button";
-import {
-  currentUserQueryKey,
-  useCurrentUser,
-} from "@/hooks/use-current-user";
+import { currentUserQueryKey, useCurrentUser } from "@/hooks/use-current-user";
 import { ApiError } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -45,22 +43,30 @@ export default function AdminDashboardPage() {
   }
 
   if (!currentUser.data.tenant) {
-    return <p className="text-sm text-zinc-600">No store is assigned to you.</p>;
+    return (
+      <p className="text-sm text-zinc-600">No store is assigned to you.</p>
+    );
   }
 
   const tenant = currentUser.data.tenant;
 
   return (
     <div className="mx-auto max-w-6xl">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Overview</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
+        Overview
+      </p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
         {tenant.name}
       </h1>
 
+      <OverviewPanel key={tenant.slug} tenantSlug={tenant.slug} />
+
       <section className="mt-8 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-200/60 sm:p-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Store status</h2>
+            <h2 className="text-lg font-semibold text-slate-950">
+              Store status
+            </h2>
             <p className="mt-1 text-sm text-zinc-600">
               {tenant.status === "active"
                 ? "Your storefront is live."
@@ -76,9 +82,13 @@ export default function AdminDashboardPage() {
             >
               {activation.isPending ? "Activating…" : "Activate store"}
             </Button>
-          ) : (
+          ) : tenant.status === "active" ? (
             <span className="w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
               Active
+            </span>
+          ) : (
+            <span className="w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-medium capitalize text-amber-800">
+              {tenant.status}
             </span>
           )}
         </div>

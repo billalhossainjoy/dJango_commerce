@@ -51,7 +51,7 @@ def empty_cart() -> dict[str, object]:
 
 def order_owner_filter(request: Request) -> dict[str, object]:
     if request.user.is_authenticated:
-        return {"customer": cast(User, request.user)}
+        return {"customer": request.user}
     return {"customer": None, "session_key": request.session.session_key or ""}
 
 
@@ -238,7 +238,7 @@ class OrderCreateView(APIView):
         cart = get_request_cart(request, tenant, create=False)
         if cart is None:
             raise ValidationError({"cart": "Your cart is empty."})
-        customer = cast(User, request.user) if request.user.is_authenticated else None
+        customer = request.user if request.user.is_authenticated else None
         order = create_order_from_cart(
             tenant=tenant,
             cart=cart,

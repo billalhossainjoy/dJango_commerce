@@ -45,7 +45,7 @@ class TenantSettingsSerializer(serializers.ModelSerializer):
         model = Tenant
         fields = ("name", "slug", "subdomain")
         read_only_fields = ("subdomain",)
-        extra_kwargs = {"slug": {"validators": []}}
+        extra_kwargs: dict[str, dict[str, object]] = {"slug": {"validators": []}}
 
     def get_subdomain(self, tenant: Tenant) -> str:
         return f"{tenant.slug}.{settings.PLATFORM_ROOT_DOMAIN}"

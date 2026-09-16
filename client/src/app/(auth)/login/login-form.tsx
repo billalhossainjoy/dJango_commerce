@@ -83,6 +83,10 @@ export function LoginForm({
 
           <FieldError>{errors.root?.message}</FieldError>
 
+          <Link href="/forgot-password" className="text-sm font-medium text-primary underline underline-offset-4">
+            Forgot your password?
+          </Link>
+
           <Button className="w-full" type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Logging in…" : "Log in"}
           </Button>

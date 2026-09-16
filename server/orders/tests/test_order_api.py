@@ -3,7 +3,7 @@ from django.test import Client
 from django.urls import reverse
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import User
+from accounts.models import OutboundEmail, User
 from catalog.models import Product
 from orders.models import Cart, Order, OrderItem
 from tenancy.models import Tenant, TenantOwner
@@ -111,6 +111,14 @@ def test_order_creation_is_idempotent(client):
     assert retry_response.status_code == 200
     assert retry_response.json()["id"] == first_response.json()["id"]
     assert Order.objects.count() == 1
+    email = OutboundEmail.objects.get()
+    assert email.recipient == "buyer@example.com"
+    assert "Canvas Backpack × 1" in email.body
+    assert "Total: $64.00 USD" in email.body
+    assert "Cash on delivery" in email.body
+    assert (
+        email.deduplication_key == f"order-confirmation:{first_response.json()['id']}"
+    )
     product.refresh_from_db()
     assert product.stock_quantity == 4
 

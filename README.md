@@ -25,7 +25,6 @@ order features have not been implemented yet.
 ```text
 client/   Next.js storefront and administration UI
 server/   Django API and business logic
-docs/     Optional local documentation; the private plan is not committed
 ```
 
 ## Development environment
@@ -109,7 +108,82 @@ To test production configuration locally after creating `.env.production`:
 DJANGO_ENVIRONMENT=production uv run --project server python server/manage.py check --deploy
 ```
 
-This setup does not yet include a production image or deployment workflow.
+## Railway deployment
+
+The Django service uses `/server` as its root directory, Railpack with Python
+3.14 (pinned in `server/.python-version`), and these service settings:
+
+- Pre-deploy command: `python manage.py migrate --noinput`
+- Start command: `sh start.sh`
+- Healthcheck: `/api/v1/readiness/` with a 120-second timeout
+- Port: `8080`
+
+Import production secrets into Railway variables, including
+`DJANGO_ENVIRONMENT=production`. Include the API hostname and
+`healthcheck.railway.app` in `ALLOWED_HOSTS`. The startup script collects static
+files and starts Gunicorn; WhiteNoise serves Django's static assets.
+
+The Next.js service uses `/client` as its root directory. Set `DJANGO_API_URL`
+to the HTTPS backend origin and `NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN` to the public
+platform domain. Rebuild the client after changing either variable because
+Next.js embeds the API rewrite and public configuration during its build.
+
+For the trial plan's single custom domain, use `*.stockfare.app` on the client
+service. Keep `NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN=stockfare.app` for tenant URLs,
+set `NEXT_PUBLIC_PLATFORM_HOSTNAME=www.stockfare.app` for platform redirects,
+and set the server's `PLATFORM_FRONTEND_ORIGIN=https://www.stockfare.app`.
+In Cloudflare, configure the wildcard CNAME and the DNS-only `_acme-challenge`
+CNAME supplied by Railway. Keep Railway's ownership verification TXT record.
+The apex `stockfare.app` requires a Cloudflare redirect to `www.stockfare.app`;
+the wildcard does not cover the apex. Preserve the request path and query string
+and keep the apex DNS record proxied so Cloudflare can perform that redirect.
+
+Deploy local server changes with `railway up --service dJango_commerce` from the
+repository root. Verify both `/api/v1/health/` and `/api/v1/readiness/` through
+the public frontend after deployment. Keep the deployment files in the GitHub
+branch used by Railway before relying on subsequent GitHub autodeploys.
+
+## Transactional email
+
+Production uses Resend HTTPS through Django's default `MAILERS` backend. Set
+`EMAIL_TRANSPORT=resend`, `RESEND_API_KEY`, and `DEFAULT_FROM_EMAIL` to a sender
+on your verified Resend domain. This works on Railway plans that block SMTP.
+Alternatively, use `EMAIL_TRANSPORT=smtp`, `SMTP_HOST=smtp.resend.com`,
+`SMTP_PORT=587`, `SMTP_USE_TLS=true`, `SMTP_USERNAME=resend`, and `SMTP_PASSWORD`
+set to the Resend API key. Development prints messages to the console; tests
+use an in-memory mailer.
+
+- Public owner and customer signup sends a verification email. New accounts
+  must verify before signing in; existing and administrator-created accounts
+  remain accessible. Verification is recorded in `email_verified_at`.
+- `/verify-email` confirms the emailed link. Without a link, it shows inbox
+  instructions; verification emails are sent automatically at signup, with no
+  resend controls in the application.
+- `/forgot-password` requests a reset; `/reset-password` accepts a new password.
+  Links expire after one hour and cannot be reused. Recovery stays within the
+  selected platform/store account scope. Password changes invalidate existing
+  JWT sessions; users may need to sign in again after this feature is deployed.
+- Checkout queues one confirmation per saved order, including items, shipping,
+  the authoritative total, and cash-on-delivery instructions. Guest orders are
+  supported. Repeating an idempotent checkout does not queue another email.
+
+Emails are saved to `accounts.OutboundEmail` in the same transaction as the
+account/order and sent after commit. Delivery failures do not roll back the account
+or order. The Django admin displays delivery status without exposing message
+content or reset links. Successful messages have their stored bodies cleared.
+
+Retry due unsent messages with:
+
+```bash
+python manage.py send_pending_emails --limit 100
+```
+
+Run this command on a scheduled worker for unattended retries. A retry schedule
+is not created automatically. Retries use exponential backoff up to one hour;
+expired verification/reset messages are skipped. Resend requests use a stable
+idempotency key to prevent duplicate acceptance within its 24-hour window.
+SMTP, or retries outside that window, cannot guarantee exactly once delivery
+if a process stops after acceptance but before recording success.
 
 ## Commit messages
 

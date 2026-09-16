@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 from django.db import transaction
 from django.db.models import Prefetch
@@ -8,6 +8,7 @@ from rest_framework.request import Request
 
 from accounts.models import User
 from catalog.models import Product, ProductImage
+from orders.emails import queue_order_confirmation
 from orders.models import Cart, CartItem, Order, OrderItem
 from tenancy.models import Tenant
 
@@ -31,7 +32,7 @@ def get_request_cart(
     create: bool,
 ) -> Cart | None:
     if request.user.is_authenticated:
-        customer = cast(User, request.user)
+        customer = request.user
         if create:
             cart, _ = Cart.objects.get_or_create(tenant=tenant, customer=customer)
             return cart
@@ -80,7 +81,10 @@ def create_order_from_cart(
     subtotal_cents = 0
     order_items: list[OrderItem] = []
     for item in cart_items:
-        product = products.get(item.product_id)
+        product_id = item.product_id
+        if product_id is None:
+            raise ValidationError({"cart": "A product in your cart is unavailable."})
+        product = products.get(product_id)
         if product is None or not product.is_active:
             raise ValidationError({"cart": "A product in your cart is unavailable."})
         if item.quantity > product.stock_quantity:
@@ -114,11 +118,14 @@ def create_order_from_cart(
     OrderItem.objects.bulk_create(order_items)
 
     for item in cart_items:
-        product = products[item.product_id]
+        product_id = item.product_id
+        assert product_id is not None
+        product = products[product_id]
         product.stock_quantity -= item.quantity
         product.save(update_fields=["stock_quantity", "updated_at"])
 
     cart.delete()
+    queue_order_confirmation(order)
     return order
 
 
@@ -145,7 +152,9 @@ def cancel_order(order: Order) -> Order:
         )
     }
     for item in items:
-        product = products.get(item.product_id)
+        product_id = item.product_id
+        assert product_id is not None
+        product = products.get(product_id)
         if product:
             product.stock_quantity += item.quantity
             product.save(update_fields=["stock_quantity", "updated_at"])

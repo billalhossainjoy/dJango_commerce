@@ -42,6 +42,7 @@ export function AuthenticatedOnly({
     if (tenantSlug && ownerTenant?.slug !== tenantSlug) {
       const hostname =
         ownerTenant?.canonical_hostname ??
+        process.env.NEXT_PUBLIC_PLATFORM_HOSTNAME ??
         process.env.NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN;
       if (hostname) redirectToHostname(hostname, "/admin");
       return;

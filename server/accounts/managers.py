@@ -11,10 +11,6 @@ if TYPE_CHECKING:
 class UserManager(BaseUserManager["User"]):
     use_in_migrations = True
 
-    @classmethod
-    def normalize_email(cls, email: str | None) -> str:
-        return super().normalize_email(email)
-
     def create_user(
         self,
         email: str,

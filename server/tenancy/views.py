@@ -12,6 +12,7 @@ from accounts.models import User
 from accounts.permissions import IsPlatformUser
 from billing.access import tenant_has_billing_access, tenant_has_subscription_access
 from tenancy.models import Tenant
+from tenancy.overview import tenant_overview
 from tenancy.serializers import (
     TenantLoginContextSerializer,
     TenantSettingsSerializer,
@@ -88,3 +89,15 @@ class TenantSettingsView(RetrieveUpdateAPIView):
     @transaction.atomic
     def perform_update(self, serializer) -> None:
         serializer.save()
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsPlatformUser])
+def overview(request: Request, tenant_slug: str) -> Response:
+    tenant = get_object_or_404(
+        Tenant, slug=tenant_slug, ownership__user=cast(User, request.user)
+    )
+    days = request.query_params.get("days", "30")
+    if days not in {"7", "30", "90"}:
+        return Response({"detail": "Choose a 7, 30, or 90 day period."}, status=400)
+    return Response(tenant_overview(tenant, int(days)))

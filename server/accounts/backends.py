@@ -1,3 +1,6 @@
+from django.contrib.auth import (
+    check_password_with_timing_attack_mitigation as password_matches,
+)
 from django.contrib.auth.backends import ModelBackend
 
 from accounts.models import User
@@ -15,12 +18,7 @@ class PlatformAuthenticationBackend(ModelBackend):
             account_type=User.AccountType.PLATFORM,
         ).first()
 
-        if user is None:
-            # Perform password hashing to reduce timing differences.
-            User().set_password(password)
-            return None
-
-        if user.check_password(password) and self.user_can_authenticate(user):
+        if password_matches(user, password) and self.user_can_authenticate(user):
             return user
 
         return None

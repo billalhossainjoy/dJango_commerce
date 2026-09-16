@@ -10,6 +10,7 @@ server/.venv/
 **/__pycache__/
 *.py[cod]
 server/db.sqlite3
+server/staticfiles/
 
 # Node / Next.js
 /node_modules/

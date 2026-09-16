@@ -3,11 +3,17 @@ from django.urls import path
 from tenancy.views import (
     TenantSettingsView,
     activate_tenant,
+    overview,
     owner_login_context,
     tenant_context,
 )
 
 urlpatterns = [
+    path(
+        "tenants/<slug:tenant_slug>/admin/overview/",
+        overview,
+        name="tenant-overview",
+    ),
     path(
         "tenants/<slug:tenant_slug>/",
         tenant_context,
