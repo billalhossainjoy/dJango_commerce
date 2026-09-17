@@ -94,6 +94,43 @@ def test_missing_cloudinary_configuration_returns_service_unavailable(client):
 
 
 @pytest.mark.django_db
+@override_settings(
+    CLOUDINARY_CLOUD_NAME="replace-with-cloud-name",
+    CLOUDINARY_API_KEY="replace-with-api-key",
+    CLOUDINARY_API_SECRET="replace-with-api-secret",
+    CLOUDINARY_UPLOAD_PRESET="replace-with-signed-upload-preset",
+)
+def test_placeholder_cloudinary_configuration_returns_service_unavailable(client):
+    owner = User.objects.create_user(
+        email="owner@example.com",
+        password="strong-test-password-123",
+        account_type=User.AccountType.PLATFORM,
+    )
+    tenant = Tenant.objects.create(slug="demo", name="Demo Store")
+    TenantOwner.objects.create(user=owner, tenant=tenant)
+    product = Product.objects.create(
+        tenant=tenant,
+        name="Canvas Backpack",
+        slug="canvas-backpack",
+        price_cents=5900,
+    )
+
+    response = client.post(
+        reverse(
+            "admin-product-image-upload-intent",
+            kwargs={"tenant_slug": tenant.slug, "product_id": product.id},
+        ),
+        data={"content_type": "image/webp", "size_bytes": 2048},
+        content_type="application/json",
+        headers=authorization_for(owner),
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Product image storage is not configured."}
+    assert not ProductImage.objects.exists()
+
+
+@pytest.mark.django_db
 @patch("catalog.views.create_product_image_upload")
 def test_product_cannot_exceed_eight_images(create_upload, client):
     owner = User.objects.create_user(
