@@ -163,7 +163,9 @@ use an in-memory mailer.
   resend controls in the application.
 - `/forgot-password` requests a reset; `/reset-password` accepts a new password.
   Links expire after one hour and cannot be reused. Recovery stays within the
-  selected platform/store account scope. Password changes invalidate existing
+  selected platform/store account scope. If an owner and a customer share an
+  inbox in the same store, each receives a separate link identifying the account.
+  Password changes invalidate existing
   JWT sessions; users may need to sign in again after this feature is deployed.
 - Checkout queues one confirmation per saved order, including items, shipping,
   the authoritative total, and cash-on-delivery instructions. Guest orders are
@@ -174,11 +176,19 @@ account/order and sent after commit. Delivery failures do not roll back the acco
 or order. The Django admin displays delivery status without exposing message
 content or reset links. Successful messages have their stored bodies cleared.
 
-Retry due unsent messages with:
+`server/start.sh` starts Gunicorn and an email retry worker together. The worker
+checks every 30 seconds and respects each message's retry backoff and expiry.
+If either process exits unexpectedly, the service exits so Railway can restart
+both. Temporary database outages are retried. No additional Railway service is
+needed. Start deployments through `sh start.sh` to keep retries running.
+
+Retry due unsent messages manually with:
 
 ```bash
 python manage.py send_pending_emails --limit 100
 ```
+
+For a dedicated worker, run `python manage.py send_pending_emails --watch`.
 
 Run this command on a scheduled worker for unattended retries. A retry schedule
 is not created automatically. Retries use exponential backoff up to one hour;

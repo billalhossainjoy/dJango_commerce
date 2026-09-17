@@ -39,8 +39,10 @@ class RequestAccountEmailView(EmailActionView):
                     email__iexact=serializer.validated_data["email"]
                 )[:2]
             )
-            if len(users) == 1:
-                user = User.objects.select_for_update().get(pk=users[0].pk)
+            # A store owner may also have a customer account with the same
+            # inbox. Each eligible identity needs its own scoped recovery link.
+            for match in sorted(users, key=lambda user: user.pk):
+                user = User.objects.select_for_update().get(pk=match.pk)
                 send_account_link(user, verification=self.verification)
         return Response(
             {

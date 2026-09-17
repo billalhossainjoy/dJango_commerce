@@ -100,9 +100,9 @@ def deliver_email(message_id: UUID) -> bool:
 
 def deliver_pending(limit: int = 100) -> int:
     now = timezone.now()
-    OutboundEmail.objects.filter(sent_at=None, expires_at__lte=now).update(
+    OutboundEmail.objects.filter(sent_at=None, expires_at__lte=now).exclude(
         body="", html_body=""
-    )
+    ).update(body="", html_body="")
     ids = list(
         OutboundEmail.objects.filter(sent_at=None, next_attempt_at__lte=now)
         .filter(Q(expires_at=None) | Q(expires_at__gt=now))

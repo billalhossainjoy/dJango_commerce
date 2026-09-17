@@ -68,8 +68,13 @@ def send_account_link(user: User, *, verification: bool) -> None:
     url = f"{frontend_origin(user)}/{path}?{query}"
     subject = "Verify your email address" if verification else "Reset your password"
     purpose = "verify your email address" if verification else "choose a new password"
+    account = "your Stockfare owner account"
+    if user.account_type == User.AccountType.CUSTOMER:
+        assert user.tenant is not None
+        account = f"your customer account at {user.tenant.name or user.tenant.slug}"
     body = (
         f"Hi {user.name or 'there'},\n\n"
+        f"This email is for {account}.\n\n"
         f"Use the link below to {purpose}:\n\n{url}\n\n"
         "This link expires in one hour and can only be used once.\n\n"
         "If you did not request this email, you can ignore it."
