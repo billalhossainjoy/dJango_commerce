@@ -18,6 +18,24 @@ def refresh_token_for(user: User) -> RefreshToken:
     return token
 
 
+def session_tokens_for(
+    user: User,
+    *,
+    include_account_type: bool = False,
+    include_is_staff: bool = False,
+) -> dict[str, Any]:
+    refresh = refresh_token_for(user)
+    data: dict[str, Any] = {
+        "refresh": str(refresh),
+        "access": str(refresh.access_token),
+    }
+    if include_account_type:
+        data["account_type"] = user.account_type
+    if include_is_staff:
+        data["is_staff"] = user.is_staff
+    return data
+
+
 def token_pair_for(
     user: User,
     *,
@@ -29,16 +47,11 @@ def token_pair_for(
             "Verify your email address before signing in. Check the verification email sent when you signed up.",
             "email_verification_required",
         )
-    refresh = refresh_token_for(user)
-    data: dict[str, Any] = {
-        "refresh": str(refresh),
-        "access": str(refresh.access_token),
-    }
-    if include_account_type:
-        data["account_type"] = user.account_type
-    if include_is_staff:
-        data["is_staff"] = user.is_staff
-    return data
+    return session_tokens_for(
+        user,
+        include_account_type=include_account_type,
+        include_is_staff=include_is_staff,
+    )
 
 
 def refresh_allowed(user: User, token: RefreshToken) -> bool:

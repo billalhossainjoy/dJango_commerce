@@ -155,7 +155,9 @@ use an in-memory mailer.
 
 - Public owner and customer signup sends a verification email. New accounts
   must verify before signing in; existing and administrator-created accounts
-  remain accessible. Verification is recorded in `email_verified_at`.
+  remain accessible. Successful verification creates the session and redirects
+  the user to the appropriate dashboard or customer account. Verification is
+  recorded in `email_verified_at`.
 - `/verify-email` confirms the emailed link. Without a link, it shows inbox
   instructions; verification emails are sent automatically at signup, with no
   resend controls in the application.

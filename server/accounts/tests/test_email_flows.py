@@ -57,7 +57,7 @@ def message_link():
     return match.group()
 
 
-def test_signup_sends_verification_and_requires_single_use_link(
+def test_signup_requires_verification_and_link_signs_owner_in(
     client, django_capture_on_commit_callbacks
 ):
     with django_capture_on_commit_callbacks(execute=True):
@@ -74,6 +74,7 @@ def test_signup_sends_verification_and_requires_single_use_link(
     assert response.status_code == 201
     user = User.objects.get(email="owner@example.com")
     assert user.email_verification_required
+    assert user.email_verified_at is None
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == [user.email]
     assert isinstance(mail.outbox[0], EmailMultiAlternatives)
@@ -84,6 +85,7 @@ def test_signup_sends_verification_and_requires_single_use_link(
     data = {key: values[0] for key, values in parse_qs(urlsplit(url).query).items()}
     login = {"email": user.email, "password": PASSWORD}
     assert client.post(reverse("auth-login"), data=login).status_code == 401
+    assert client.post(reverse("token-refresh")).status_code == 401
     # A verification token cannot change a password.
     assert (
         client.post(
@@ -91,7 +93,15 @@ def test_signup_sends_verification_and_requires_single_use_link(
         ).status_code
         == 400
     )
-    assert client.post(reverse("auth-verify-email"), data=data).status_code == 200
+    verified = client.post(reverse("auth-verify-email"), data=data)
+    assert verified.status_code == 200
+    assert verified.json()["access"]
+    assert verified.json()["account_type"] == User.AccountType.PLATFORM
+    assert verified.json()["is_staff"] is False
+    assert verified.json()["redirect_to"] == "/admin"
+    assert "refresh" not in verified.json()
+    assert verified.cookies["platform_refresh_token"].value
+    assert client.post(reverse("token-refresh")).status_code == 200
     assert client.post(reverse("auth-verify-email"), data=data).status_code == 400
     assert client.post(reverse("auth-login"), data=login).status_code == 200
 
@@ -112,6 +122,21 @@ def test_customer_links_are_scoped_to_the_store(
         )
     assert response.status_code == 201
     user = User.objects.get(email="buyer@example.com")
+    assert user.email_verification_required
+    assert user.email_verified_at is None
+    assert (
+        client.post(
+            reverse("customer-auth-login", kwargs={"tenant_slug": first.slug}),
+            data={"email": user.email, "password": PASSWORD},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            reverse("customer-auth-refresh", kwargs={"tenant_slug": first.slug})
+        ).status_code
+        == 401
+    )
     assert "https://first.stockfare.app/verify-email?" in mail.outbox[0].body
     token = payload(user, verification_tokens)
     assert (
@@ -122,13 +147,66 @@ def test_customer_links_are_scoped_to_the_store(
         == 400
     )
     assert client.post(reverse("auth-verify-email"), data=token).status_code == 400
+    verified = client.post(
+        reverse("customer-verify-email", kwargs={"tenant_slug": first.slug}),
+        data=token,
+    )
+    assert verified.status_code == 200
+    assert verified.json()["access"]
+    assert verified.json()["account_type"] == User.AccountType.CUSTOMER
+    assert verified.json()["redirect_to"] == "/account"
+    assert "refresh" not in verified.json()
+    assert verified.cookies["customer_refresh_token"].value
     assert (
         client.post(
-            reverse("customer-verify-email", kwargs={"tenant_slug": first.slug}),
-            data=token,
+            reverse("customer-auth-refresh", kwargs={"tenant_slug": first.slug})
         ).status_code
         == 200
     )
+
+
+@pytest.mark.parametrize(
+    "account_type", [User.AccountType.PLATFORM, User.AccountType.CUSTOMER]
+)
+@pytest.mark.parametrize("verification_required", [False, True])
+def test_only_accounts_marked_for_verification_are_blocked(
+    client, account_type, verification_required
+):
+    tenant = Tenant.objects.create(slug="verification", status=Tenant.Status.ACTIVE)
+    user = User.objects.create_user(
+        email="unverified@example.com",
+        password=PASSWORD,
+        account_type=account_type,
+        tenant=tenant if account_type == User.AccountType.CUSTOMER else None,
+        email_verification_required=verification_required,
+    )
+    if account_type == User.AccountType.CUSTOMER:
+        kwargs = {"tenant_slug": tenant.slug}
+        login_url = reverse("customer-auth-login", kwargs=kwargs)
+        refresh_url = reverse("customer-auth-refresh", kwargs=kwargs)
+        profile_url = reverse("customer-auth-me", kwargs=kwargs)
+    else:
+        login_url = reverse("auth-login")
+        refresh_url = reverse("token-refresh")
+        profile_url = reverse("auth-me")
+    login = client.post(login_url, data={"email": user.email, "password": PASSWORD})
+    if verification_required:
+        assert login.status_code == 401
+        assert login.json()["code"] == "email_verification_required"
+        assert client.post(refresh_url).status_code == 401
+        return
+    assert login.status_code == 200
+    refreshed = client.post(refresh_url)
+    assert refreshed.status_code == 200
+    assert (
+        client.get(
+            profile_url,
+            headers={"authorization": f"Bearer {refreshed.json()['access']}"},
+        ).status_code
+        == 200
+    )
+    user.refresh_from_db()
+    assert user.email_verified_at is None
 
 
 def test_reset_is_single_use_and_revokes_access_and_refresh(
