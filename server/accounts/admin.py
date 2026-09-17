@@ -20,7 +20,6 @@ class UserAdmin(DjangoUserAdmin):
                 "fields": (
                     "account_type",
                     "tenant",
-                    "email_verification_required",
                     "email_verified_at",
                 )
             },

@@ -38,7 +38,7 @@ Production's Resend backend path is `accounts.emails.backend.ResendEmailBackend`
 | `backends.py`, `serializers/authentication.py` | Reused Django's password-hashing helper. Platform login now performs hashing for unknown and inactive accounts, too. Kept tenant-owner matching and ambiguous-login rejection. |
 | `permissions.py` | Reused the platform-user permission when checking platform administrators. |
 | `throttles.py` | Kept the separate tenant and email rate limits. |
-| `tokens.py` | Kept tenant claims, verification requirements, and password-change revocation. |
+| `tokens.py` | Keeps tenant claims and password-change revocation. Email verification is optional for login and refresh, including legacy accounts. |
 | `selectors.py` | Kept tenant availability and account-scope checks. |
 | `serializers/platform.py`, `serializers/customer.py` | Used field validators for signup passwords and reused the owner-tenant response serializer. Kept signup transactions and email-change verification. |
 | `serializers/email.py`, `views/email.py` | Kept single-use token validation and generic recovery responses. Combined link-user lookup and row locking into one database query. |

@@ -36,7 +36,7 @@ dev = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py", "*_test.py"]
-testpaths = ["tests", "accounts", "catalog", "customers", "orders", "tenancy"]
+testpaths = ["tests", "accounts", "billing", "catalog", "customers", "orders", "platform_admin", "tenancy"]
 addopts = [
     "-ra",
     "--strict-config",

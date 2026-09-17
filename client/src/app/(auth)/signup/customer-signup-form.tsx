@@ -40,7 +40,7 @@ export function CustomerSignupForm({ tenantSlug }: { tenantSlug: string }) {
   const submit = handleSubmit(async ({ email, password }) => {
     try {
       await auth.signup({ email, password });
-      router.replace("/verify-email");
+      router.replace("/login");
     } catch (error) {
       setError("root", {
         message: getApiErrorMessage(error, "Unable to create your account."),

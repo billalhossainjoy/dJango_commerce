@@ -57,7 +57,6 @@ class SignupSerializer(CurrentUserSerializer):
             user = User.objects.create_user(
                 **validated_data,
                 account_type=User.AccountType.PLATFORM,
-                email_verification_required=True,
             )
             tenant = Tenant.objects.create(
                 name=store_name,

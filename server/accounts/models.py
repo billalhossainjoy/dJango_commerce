@@ -28,7 +28,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     email_verified_at = models.DateTimeField(null=True, blank=True)
-    # Existing and administrator-created accounts keep access; public signup opts in.
+    # Legacy field retained for deployment compatibility; verification is optional.
     email_verification_required = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 
