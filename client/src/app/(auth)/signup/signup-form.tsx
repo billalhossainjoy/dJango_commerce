@@ -33,7 +33,7 @@ const signupSchema = z
 
 type SignupValues = z.infer<typeof signupSchema>;
 
-function getPlatformLoginUrl(): string {
+function getPlatformVerificationUrl(): string {
   const rootDomain =
     process.env.NEXT_PUBLIC_PLATFORM_HOSTNAME ??
     process.env.NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN;
@@ -42,7 +42,7 @@ function getPlatformLoginUrl(): string {
   }
 
   const port = window.location.port ? `:${window.location.port}` : "";
-  return `${window.location.protocol}//${rootDomain}${port}/login`;
+  return `${window.location.protocol}//${rootDomain}${port}/verify-email`;
 }
 
 export function SignupForm() {
@@ -71,7 +71,7 @@ export function SignupForm() {
   const submitSignup = handleSubmit(async (values) => {
     try {
       await signup(values);
-      window.location.assign(getPlatformLoginUrl());
+      window.location.assign(getPlatformVerificationUrl());
     } catch (error) {
       setError("root", {
         message: getApiErrorMessage(
