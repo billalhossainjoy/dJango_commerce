@@ -57,6 +57,7 @@ class CustomerSignupSerializer(serializers.ModelSerializer):
                 **validated_data,
                 tenant=self.context["tenant"],
                 account_type=User.AccountType.CUSTOMER,
+                email_verification_required=True,
             )
             send_account_link(user, verification=True)
         return user
@@ -83,6 +84,7 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
         changed = validated_data.get("email", instance.email) != instance.email
         if changed:
             validated_data["email_verified_at"] = None
+            validated_data["email_verification_required"] = True
         user = super().update(instance, validated_data)
         if changed:
             send_account_link(user, verification=True)

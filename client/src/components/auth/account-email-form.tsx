@@ -1,13 +1,29 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import type { AuthTokens } from "@/app/app.service";
+import { claimGuestCart } from "@/app/(site)/cart/use-cart";
 import { Button } from "@/components/ui/button";
 import { apiRequest, getApiErrorMessage } from "@/lib/api-client";
+import { authSessionQueryKey, useAuthStore } from "@/stores/auth-store";
+import {
+  customerSessionQueryKey,
+  useCustomerAuthStore,
+} from "@/stores/customer-auth-store";
 
 type Mode = "verify" | "forgot" | "reset";
+
+type VerificationResult = {
+  detail: string;
+  access?: string;
+  account_type?: "platform" | "customer";
+  is_staff?: boolean;
+  redirect_to?: string;
+};
 
 export function AccountEmailForm({
   mode,
@@ -20,6 +36,12 @@ export function AccountEmailForm({
   uid?: string;
   token?: string;
 }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const setOwnerAuthenticated = useAuthStore((state) => state.setAuthenticated);
+  const setCustomerAuthenticated = useCustomerAuthStore(
+    (state) => state.setAuthenticated,
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -42,16 +64,34 @@ export function AccountEmailForm({
           : mode === "verify"
             ? { uid, token }
             : { email };
-      return apiRequest<{ detail: string }>(`${base}${path}`, {
+      return apiRequest<VerificationResult>(`${base}${path}`, {
         method: "POST",
         body,
       });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       setPassword("");
       setConfirmation("");
-      if (hasLink)
+      if (mode === "verify" && result.access && result.redirect_to) {
+        if (tenantSlug) {
+          queryClient.setQueryData(customerSessionQueryKey(tenantSlug), {
+            access: result.access,
+          });
+          setCustomerAuthenticated(tenantSlug, result.access);
+          claimGuestCart(queryClient, tenantSlug, result.access);
+        } else {
+          queryClient.setQueryData<AuthTokens>(authSessionQueryKey, {
+            access: result.access,
+            is_staff: result.is_staff,
+          });
+          setOwnerAuthenticated(result.access);
+        }
+        router.replace(result.redirect_to);
+        return;
+      }
+      if (hasLink) {
         window.history.replaceState(null, "", window.location.pathname);
+      }
     },
   });
   const completed = mutation.isSuccess;
@@ -69,8 +109,8 @@ export function AccountEmailForm({
       : mode === "reset"
         ? "Use a strong password that you don’t use for other accounts."
         : hasLink
-          ? "Confirm your email address. Verification is optional; you can already sign in and use your account."
-          : "A verification email is sent automatically when you sign up. Verification is optional—you can sign in and use your account now.";
+          ? "Confirm your email address to sign in and continue to your account."
+          : "A verification email was sent automatically when you signed up. Open that link to sign in and continue.";
   const invalidReset = mode === "reset" && !hasLink;
   return (
     <div>

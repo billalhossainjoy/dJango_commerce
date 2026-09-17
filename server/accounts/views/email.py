@@ -16,6 +16,8 @@ from accounts.models import User
 from accounts.selectors import scoped_users
 from accounts.serializers.email import EmailInput, LinkInput, ResetInput
 from accounts.throttles import EmailActionThrottle
+from accounts.tokens import session_tokens_for
+from accounts.views.session import move_refresh_to_cookie
 
 
 class EmailActionView(APIView):
@@ -85,7 +87,28 @@ class VerifyEmailView(EmailActionView):
                 )
             user.email_verified_at = timezone.now()
             user.save(update_fields=["email_verified_at"])
-        return Response({"detail": "Your email is verified. You can now sign in."})
+            is_platform = user.account_type == User.AccountType.PLATFORM
+        # Issue the session after verification is committed so a token error
+        # cannot roll back email_verified_at and leave login blocked.
+        tokens = session_tokens_for(
+            user,
+            include_account_type=True,
+            include_is_staff=is_platform,
+        )
+        response = Response(
+            {
+                "detail": "Your email is verified. You are now signed in.",
+                "redirect_to": (
+                    "/platform-admin"
+                    if is_platform and user.is_staff
+                    else "/admin"
+                    if is_platform
+                    else "/account"
+                ),
+                **tokens,
+            }
+        )
+        return move_refresh_to_cookie(response, user.account_type)
 
 
 class ResetPasswordView(EmailActionView):
