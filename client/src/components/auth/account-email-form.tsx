@@ -69,8 +69,8 @@ export function AccountEmailForm({
       : mode === "reset"
         ? "Use a strong password that you don’t use for other accounts."
         : hasLink
-          ? "Confirm your email address to finish setting up your account."
-          : "A verification email is sent automatically when you sign up. Check your inbox and spam folder, then open the link to verify your account.";
+          ? "Confirm your email address. Verification is optional; you can already sign in and use your account."
+          : "A verification email is sent automatically when you sign up. Verification is optional—you can sign in and use your account now.";
   const invalidReset = mode === "reset" && !hasLink;
   return (
     <div>

@@ -1,6 +1,5 @@
 from typing import Any
 
-from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.utils import get_md5_hash_password
 
@@ -24,11 +23,6 @@ def token_pair_for(
     include_account_type: bool = False,
     include_is_staff: bool = False,
 ) -> dict[str, Any]:
-    if user.email_verification_required and user.email_verified_at is None:
-        raise AuthenticationFailed(
-            "Verify your email address before signing in. Check the verification email sent when you signed up.",
-            "email_verification_required",
-        )
     refresh = refresh_token_for(user)
     data: dict[str, Any] = {
         "refresh": str(refresh),
@@ -42,6 +36,4 @@ def token_pair_for(
 
 
 def refresh_allowed(user: User, token: RefreshToken) -> bool:
-    return token.get("hash_password") == get_md5_hash_password(user.password) and not (
-        user.email_verification_required and user.email_verified_at is None
-    )
+    return token.get("hash_password") == get_md5_hash_password(user.password)

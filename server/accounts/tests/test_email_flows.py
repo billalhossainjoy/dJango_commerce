@@ -57,7 +57,7 @@ def message_link():
     return match.group()
 
 
-def test_signup_sends_verification_and_requires_single_use_link(
+def test_signup_sends_optional_single_use_verification_link(
     client, django_capture_on_commit_callbacks
 ):
     with django_capture_on_commit_callbacks(execute=True):
@@ -73,7 +73,8 @@ def test_signup_sends_verification_and_requires_single_use_link(
         )
     assert response.status_code == 201
     user = User.objects.get(email="owner@example.com")
-    assert user.email_verification_required
+    assert not user.email_verification_required
+    assert user.email_verified_at is None
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == [user.email]
     assert isinstance(mail.outbox[0], EmailMultiAlternatives)
@@ -83,7 +84,8 @@ def test_signup_sends_verification_and_requires_single_use_link(
     assert "attacker.example" not in url
     data = {key: values[0] for key, values in parse_qs(urlsplit(url).query).items()}
     login = {"email": user.email, "password": PASSWORD}
-    assert client.post(reverse("auth-login"), data=login).status_code == 401
+    assert client.post(reverse("auth-login"), data=login).status_code == 200
+    assert client.post(reverse("token-refresh")).status_code == 200
     # A verification token cannot change a password.
     assert (
         client.post(
@@ -112,6 +114,21 @@ def test_customer_links_are_scoped_to_the_store(
         )
     assert response.status_code == 201
     user = User.objects.get(email="buyer@example.com")
+    assert not user.email_verification_required
+    assert user.email_verified_at is None
+    assert (
+        client.post(
+            reverse("customer-auth-login", kwargs={"tenant_slug": first.slug}),
+            data={"email": user.email, "password": PASSWORD},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            reverse("customer-auth-refresh", kwargs={"tenant_slug": first.slug})
+        ).status_code
+        == 200
+    )
     assert "https://first.stockfare.app/verify-email?" in mail.outbox[0].body
     token = payload(user, verification_tokens)
     assert (
@@ -129,6 +146,49 @@ def test_customer_links_are_scoped_to_the_store(
         ).status_code
         == 200
     )
+
+
+@pytest.mark.parametrize(
+    "account_type", [User.AccountType.PLATFORM, User.AccountType.CUSTOMER]
+)
+@pytest.mark.parametrize("legacy_required", [False, True])
+def test_unverified_accounts_can_login_refresh_and_access_profile(
+    client, account_type, legacy_required
+):
+    tenant = Tenant.objects.create(slug="optional", status=Tenant.Status.ACTIVE)
+    user = User.objects.create_user(
+        email="unverified@example.com",
+        password=PASSWORD,
+        account_type=account_type,
+        tenant=tenant if account_type == User.AccountType.CUSTOMER else None,
+        email_verification_required=legacy_required,
+    )
+    if account_type == User.AccountType.CUSTOMER:
+        kwargs = {"tenant_slug": tenant.slug}
+        login_url = reverse("customer-auth-login", kwargs=kwargs)
+        refresh_url = reverse("customer-auth-refresh", kwargs=kwargs)
+        profile_url = reverse("customer-auth-me", kwargs=kwargs)
+    else:
+        login_url = reverse("auth-login")
+        refresh_url = reverse("token-refresh")
+        profile_url = reverse("auth-me")
+    assert (
+        client.post(
+            login_url, data={"email": user.email, "password": PASSWORD}
+        ).status_code
+        == 200
+    )
+    refreshed = client.post(refresh_url)
+    assert refreshed.status_code == 200
+    assert (
+        client.get(
+            profile_url,
+            headers={"authorization": f"Bearer {refreshed.json()['access']}"},
+        ).status_code
+        == 200
+    )
+    user.refresh_from_db()
+    assert user.email_verified_at is None
 
 
 def test_reset_is_single_use_and_revokes_access_and_refresh(
@@ -259,6 +319,97 @@ def test_store_owner_can_request_reset_from_tenant_login(client):
     )
     email = OutboundEmail.objects.get()
     assert "https://www.stockfare.app/reset-password?" in email.body
+
+
+def test_shared_owner_customer_inbox_receives_both_scoped_reset_links(
+    client, django_capture_on_commit_callbacks
+):
+    owner = platform_user()
+    tenant = Tenant.objects.create(slug="owned", name="Owned Store")
+    TenantOwner.objects.create(user=owner, tenant=tenant)
+    customer = User.objects.create_user(
+        email=owner.email,
+        password=PASSWORD,
+        account_type=User.AccountType.CUSTOMER,
+        tenant=tenant,
+    )
+    with django_capture_on_commit_callbacks(execute=True):
+        response = client.post(
+            reverse("customer-request-password-reset", kwargs={"tenant_slug": "owned"}),
+            data={"email": owner.email.upper()},
+        )
+    assert response.status_code == 200
+    assert len(mail.outbox) == 2
+    for message in mail.outbox:
+        assert message.to == [owner.email]
+        link = re.search(r"https://\S+", str(message.body))
+        assert link is not None
+        url = urlsplit(link.group())
+        data = {key: values[0] for key, values in parse_qs(url.query).items()}
+        if url.hostname == "www.stockfare.app":
+            assert "Stockfare owner account" in message.body
+            route = reverse("auth-reset-password")
+        else:
+            assert url.hostname == "owned.stockfare.app"
+            assert "customer account at Owned Store" in message.body
+            route = reverse("customer-reset-password", kwargs={"tenant_slug": "owned"})
+        assert (
+            client.post(route, data={**data, "new_password": NEW_PASSWORD}).status_code
+            == 200
+        )
+        assert (
+            client.post(route, data={**data, "new_password": PASSWORD}).status_code
+            == 400
+        )
+    for user in (owner, customer):
+        user.refresh_from_db()
+        assert user.check_password(NEW_PASSWORD)
+
+
+def test_failed_password_reset_email_retries_with_a_working_link(
+    client, monkeypatch, django_capture_on_commit_callbacks
+):
+    user = platform_user()
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            "accounts.emails.delivery.EmailMultiAlternatives.send",
+            lambda *args, **kwargs: 0,
+        )
+        with django_capture_on_commit_callbacks(execute=True):
+            response = client.post(
+                reverse("auth-request-password-reset"), data={"email": user.email}
+            )
+    assert response.status_code == 200
+    queued = OutboundEmail.objects.get()
+    assert queued.sent_at is None
+    assert queued.attempts == 1
+    assert deliver_pending() == 0  # Respect the retry delay.
+    OutboundEmail.objects.filter(pk=queued.pk).update(next_attempt_at=timezone.now())
+    assert deliver_pending() == 1
+    assert deliver_pending() == 0
+    data = {
+        key: values[0]
+        for key, values in parse_qs(urlsplit(message_link()).query).items()
+    }
+    assert (
+        client.post(
+            reverse("auth-reset-password"), data={**data, "new_password": NEW_PASSWORD}
+        ).status_code
+        == 200
+    )
+
+
+def test_expired_reset_email_is_not_sent_and_content_is_removed(client):
+    user = platform_user()
+    client.post(reverse("auth-request-password-reset"), data={"email": user.email})
+    queued = OutboundEmail.objects.get()
+    OutboundEmail.objects.filter(pk=queued.pk).update(
+        expires_at=timezone.now() - timedelta(seconds=1)
+    )
+    assert deliver_pending() == 0
+    queued.refresh_from_db()
+    assert queued.sent_at is None
+    assert queued.body == queued.html_body == ""
 
 
 def test_email_failure_is_retained_for_retry_without_losing_signup(
